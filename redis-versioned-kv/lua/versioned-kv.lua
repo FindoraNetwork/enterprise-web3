@@ -1,4 +1,4 @@
-#!lua name=versioned-kv
+#!lua name=versioned_kv
 
 -- vkv_set <key> <height> <value>
 local function vkv_set (keys, args)
@@ -25,9 +25,13 @@ local function vkv_get(keys, args)
     end
 
     local res = redis.call('ZRANGE', key, height, '-inf', 'BYSCORE', 'REV', 'LIMIT', 0, 1)
-    local value_key = res[1]
+    if #res ~= 0 then
+        local value_key = res[1]
 
-    return redis.call('GET', value_key)
+        return redis.call('GET', value_key)
+    else
+        return nil
+    end
 end
 
 -- vkv_latest <key> -> <height>
@@ -35,9 +39,14 @@ local function vkv_latest(keys)
     local key = keys[1]
 
     local res = redis.call('ZRANGE', key, '+inf', '-inf', 'BYSCORE', 'REV', 'LIMIT', 0, 1)
-    local value_key = res[1]
 
-    return redis.call('ZSCORE', value_key)
+    if #res ~=0 then
+        local value_key = res[1]
+
+        return redis.call('ZSCORE', key, value_key)
+    else
+        return nil
+    end
 end
 
 redis.register_function("vkv_set", vkv_set)
