@@ -1,4 +1,5 @@
 [workspace]
 members = [
     "redis-versioned-kv",
+    "evm-exporter",
 ]
