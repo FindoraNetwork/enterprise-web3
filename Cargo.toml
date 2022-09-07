@@ -2,4 +2,5 @@
 members = [
     "redis-versioned-kv",
     "evm-exporter",
+    "web3-service",
 ]
