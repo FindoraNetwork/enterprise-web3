@@ -1,4 +1,6 @@
-mod ethvm;
+
+mod rpc;
+
 
 fn main() {
     println!("Hello, world!");

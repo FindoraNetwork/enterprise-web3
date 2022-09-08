@@ -12,4 +12,10 @@ evm = { version = "0.29.0", default-features = false, features = ["with-serde"] 
 ethereum = { version = "0.9.0", default-features = false, features = ["with-serde"] }
 redis = { version = "0.21", default-features = false }
 redis-versioned-kv = { path = "../redis-versioned-kv" }
+evm-exporter = { path = "../evm-exporter" }
 anyhow = "1.0.64"
+tokio = { version = "1.21.0", features = ["full"] }
+web3-rpc-core = { git = "https://github.com/FindoraNetwork/web3-rpc.git" }
+jsonrpc-http-server = "18.0"
+jsonrpc-ws-server = "18.0"
+jsonrpc-core = "18.0"
