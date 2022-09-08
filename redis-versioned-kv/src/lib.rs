@@ -29,6 +29,21 @@ pub trait VersionedKVCommand: ConnectionLike + Sized {
             .arg(height)
             .query(self)
     }
+
+    fn vkv_del<K>(&mut self, key: K, height: u32) -> RedisResult<()>
+    where
+        K: ToRedisArgs,
+    {
+        redis::cmd("FCALL")
+            .arg("vkv_del")
+            .arg(1)
+            .arg(key)
+            .arg(height)
+            .query(self)?;
+
+        Ok(())
+    }
+
 }
 
 impl<T: ConnectionLike + Sized> VersionedKVCommand for T {}
@@ -53,6 +68,7 @@ mod tests {
 
         con.vkv_set(key, 4, v1).unwrap();
         con.vkv_set(key, 9, v2).unwrap();
+        con.vkv_del(key, 12).unwrap();
 
         for i in 0..4 {
             let r: Option<String> = con.vkv_get(key, i).unwrap();
@@ -64,10 +80,15 @@ mod tests {
 
             assert_eq!(r, Some(String::from(v1)));
         }
-        for i in 9..15 {
+        for i in 9..12 {
             let r: Option<String> = con.vkv_get(key, i).unwrap();
 
             assert_eq!(r, Some(String::from(v2)));
+        }
+        for i in 12..15 {
+            let r: Option<String> = con.vkv_get(key, i).unwrap();
+
+            assert_eq!(r, None);
         }
     }
 }
