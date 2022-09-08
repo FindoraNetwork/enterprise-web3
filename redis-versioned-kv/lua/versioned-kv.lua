@@ -29,6 +29,21 @@ local function vkv_get(keys, args)
     end
 end
 
+-- vkv_del <key> <height>
+local function vkv_del(keys, args)
+    local key = keys[1]
+    local height = args[1]
+
+    local heighted_key = string.format("%s:%08X", key, height)
+
+    local value = args[2]
+
+    redis.call('ZADD', key, height, heighted_key)
+
+    redis.call('DEL', heighted_key)
+end
+
 redis.register_function("vkv_set", vkv_set)
 redis.register_function("vkv_get", vkv_get)
+redis.register_function("vkv_del", vkv_del)
 
