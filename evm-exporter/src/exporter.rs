@@ -1,8 +1,8 @@
-use primitive_types::{H160, U256, H256};
-use redis::{ConnectionLike, Commands};
+use primitive_types::{H160, H256, U256};
+use redis::{Commands, ConnectionLike};
 use redis_versioned_kv::VersionedKVCommand;
 
-use crate::{Result, keys, AccountBasic};
+use crate::{keys, AccountBasic, Result};
 
 pub struct Exporter<C> {
     conn: C,
@@ -12,7 +12,11 @@ pub struct Exporter<C> {
 
 impl<C: ConnectionLike> Exporter<C> {
     pub fn new(conn: C, prefix: String) -> Self {
-        Self { conn, prefix, height: 0 }
+        Self {
+            conn,
+            prefix,
+            height: 0,
+        }
     }
 
     pub fn begin_block(&mut self, height: u32) -> Result<()> {
@@ -33,7 +37,6 @@ impl<C: ConnectionLike> Exporter<C> {
         Ok(())
     }
 
-
     pub fn end_transaction(&mut self, _hash: Vec<u8>) -> Result<()> {
         Ok(())
     }
@@ -49,20 +52,24 @@ impl<C: ConnectionLike> Exporter<C> {
 
         let height = self.height;
 
-        self.conn.vkv_set(balance_key, height, keys::hex_u256(basic.balance))?;
-        self.conn.vkv_set(code_key, height, hex::encode(basic.code))?;
-        self.conn.vkv_set(nonce_key, height, keys::hex_u256(basic.nonce))?;
+        self.conn
+            .vkv_set(balance_key, height, keys::hex_u256(basic.balance))?;
+        self.conn
+            .vkv_set(code_key, height, hex::encode(basic.code))?;
+        self.conn
+            .vkv_set(nonce_key, height, keys::hex_u256(basic.nonce))?;
 
         Ok(())
     }
 
-    pub fn update_state(&mut self, address: H160, index: U256, value: H256) -> Result<()> {
+    pub fn update_state(&mut self, address: H160, index: H256, value: H256) -> Result<()> {
         let state_key = keys::state_key(&self.prefix, address, index);
 
         if value.is_zero() {
             self.conn.vkv_del(state_key, self.height)?;
         } else {
-            self.conn.vkv_set(state_key, self.height, hex::encode(value))?;
+            self.conn
+                .vkv_set(state_key, self.height, hex::encode(value))?;
         }
 
         Ok(())

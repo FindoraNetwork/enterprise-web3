@@ -1,8 +1,8 @@
-use primitive_types::{H160, U256, H256};
+use primitive_types::{H160, H256, U256};
 use redis::ConnectionLike;
 use redis_versioned_kv::VersionedKVCommand;
 
-use crate::{Result, AccountBasic, keys, Error};
+use crate::{keys, AccountBasic, Error, Result};
 
 pub struct Getter<C> {
     conn: C,
@@ -21,13 +21,17 @@ impl<C: ConnectionLike> Getter<C> {
         Ok(s)
     }
 
-     pub fn new_genesis(conn: C, prefix: String) -> Self {
+    pub fn new_genesis(conn: C, prefix: String) -> Self {
         Self::new_with_height(conn, prefix, 0)
-     }
+    }
 
-     pub fn new_with_height(conn: C, prefix: String, height: u32) -> Self {
-         Self { conn, prefix, height }
-     }
+    pub fn new_with_height(conn: C, prefix: String, height: u32) -> Self {
+        Self {
+            conn,
+            prefix,
+            height,
+        }
+    }
 
     pub fn latest_height(&mut self) -> Result<u32> {
         Ok(0)
@@ -62,11 +66,13 @@ impl<C: ConnectionLike> Getter<C> {
         };
 
         Ok(AccountBasic {
-            code, nonce, balance
+            code,
+            nonce,
+            balance,
         })
     }
 
-    pub fn get_state(&mut self, address: H160, index: U256) -> Result<H256> {
+    pub fn get_state(&mut self, address: H160, index: H256) -> Result<H256> {
         let state_key = keys::state_key(&self.prefix, address, index);
 
         let value: Option<String> = self.conn.vkv_get(state_key, self.height)?;
@@ -74,7 +80,7 @@ impl<C: ConnectionLike> Getter<C> {
         let h = if let Some(s) = value {
             let v = hex::decode(s)?;
             if v.len() != 32 {
-                return Err(Error::LengthMismatch)
+                return Err(Error::LengthMismatch);
             }
 
             H256::from_slice(&v)
@@ -85,4 +91,3 @@ impl<C: ConnectionLike> Getter<C> {
         Ok(h)
     }
 }
-

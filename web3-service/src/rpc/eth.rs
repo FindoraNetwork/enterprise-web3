@@ -1,28 +1,32 @@
-use std::sync::Arc;
+use crate::vm::EthVmBackend;
 use ethereum_types::{Address, H160, H256, H64, U256, U64};
-use evm::backend::MemoryBackend;
-use tokio::sync::Mutex;
-use web3_rpc_core::EthApi;
-use web3_rpc_core::types::*;
+use evm::backend::{Backend, Basic, MemoryBackend};
+use evm::executor::stack::MemoryStackState;
+use evm_exporter::Getter;
 use jsonrpc_core::*;
+use redis::{Client, ConnectionLike};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use web3_rpc_core::types::*;
+use web3_rpc_core::EthApi;
 
 pub struct EthService {
-    conn: Arc<Mutex<redis::Client>>,
+    eth_vm_backend: EthVmBackend,
 }
 
 impl EthService {
-    pub fn new(redis_addr: &str) -> anyhow::Result<Self>{
-        let conn = redis::Client::open(redis_addr)?;
-        Ok(Self{
-            conn: Arc::new(Mutex::new(conn))
+    pub fn new(
+        gas_price: u64,
+        redis_addr: &str,
+        upstream: &str,
+        chain_id: u32,
+    ) -> anyhow::Result<Self> {
+        let backend = EthVmBackend::new(gas_price, redis_addr, upstream, chain_id)?;
+        Ok(Self {
+            eth_vm_backend: backend,
         })
     }
-
-    pub fn gen_backend(height: u32, account: Address) -> anyhow::Result<MemoryBackend> {
-        todo!()
-    }
 }
-
 
 impl EthApi for EthService {
     fn protocol_version(&self) -> BoxFuture<Result<u64>> {
@@ -121,11 +125,19 @@ impl EthApi for EthService {
         todo!()
     }
 
-    fn transaction_by_block_hash_and_index(&self, _: H256, _: Index) -> BoxFuture<Result<Option<Transaction>>> {
+    fn transaction_by_block_hash_and_index(
+        &self,
+        _: H256,
+        _: Index,
+    ) -> BoxFuture<Result<Option<Transaction>>> {
         todo!()
     }
 
-    fn transaction_by_block_number_and_index(&self, _: BlockNumber, _: Index) -> BoxFuture<Result<Option<Transaction>>> {
+    fn transaction_by_block_number_and_index(
+        &self,
+        _: BlockNumber,
+        _: Index,
+    ) -> BoxFuture<Result<Option<Transaction>>> {
         todo!()
     }
 
@@ -137,7 +149,11 @@ impl EthApi for EthService {
         todo!()
     }
 
-    fn uncle_by_block_number_and_index(&self, _: BlockNumber, _: Index) -> Result<Option<RichBlock>> {
+    fn uncle_by_block_number_and_index(
+        &self,
+        _: BlockNumber,
+        _: Index,
+    ) -> Result<Option<RichBlock>> {
         todo!()
     }
 
