@@ -29,22 +29,6 @@ local function vkv_get(keys, args)
     end
 end
 
--- vkv_latest <key> -> <height>
-local function vkv_latest(keys)
-    local key = keys[1]
-
-    local res = redis.call('ZRANGE', key, '+inf', '-inf', 'BYSCORE', 'REV', 'LIMIT', 0, 1)
-
-    if #res ~=0 then
-        local value_key = res[1]
-
-        return redis.call('ZSCORE', key, value_key)
-    else
-        return nil
-    end
-end
-
 redis.register_function("vkv_set", vkv_set)
 redis.register_function("vkv_get", vkv_get)
-redis.register_function("vkv_latest", vkv_latest)
 

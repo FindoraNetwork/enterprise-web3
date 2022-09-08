@@ -29,18 +29,6 @@ pub trait VersionedKVCommand: ConnectionLike + Sized {
             .arg(height)
             .query(self)
     }
-
-    fn vkv_latest<K>(&mut self, key: K) -> RedisResult<u32>
-    where
-        K: ToRedisArgs,
-    {
-        let res: u32 = redis::cmd("FCALL")
-            .arg("vkv_latest")
-            .arg(1)
-            .arg(key)
-            .query(self)?;
-        Ok(res)
-    }
 }
 
 impl<T: ConnectionLike + Sized> VersionedKVCommand for T {}
