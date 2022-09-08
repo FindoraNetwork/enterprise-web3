@@ -15,14 +15,9 @@ local function vkv_set (keys, args)
 end
 
 -- vkv_get <key> <height> -> <value>
--- vkv_get <key> latest -> <value>
 local function vkv_get(keys, args)
     local key = keys[1]
     local height = args[1]
-
-    if height == 'latest' then
-        height = '+inf'
-    end
 
     local res = redis.call('ZRANGE', key, height, '-inf', 'BYSCORE', 'REV', 'LIMIT', 0, 1)
     if #res ~= 0 then
