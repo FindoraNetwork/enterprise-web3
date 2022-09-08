@@ -20,7 +20,7 @@ pub fn state_key(prefix: &str, addr: H160, index: U256) -> String {
     format!("{}:state:addr.{}:index:u256.{}", prefix, hex::encode(addr), hex_u256(index))
 }
 
-pub fn current_height_key(prefix: &str) -> String {
+pub fn latest_height_key(prefix: &str) -> String {
     format!("{}:height", prefix)
 }
 

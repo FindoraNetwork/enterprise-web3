@@ -12,3 +12,4 @@ thiserror = "1.0.34"
 redis = { version = "0.21", default-features = false }
 redis-versioned-kv = { path = "../redis-versioned-kv" }
 hex = "0.4.3"
+uint = "0.9.3"
