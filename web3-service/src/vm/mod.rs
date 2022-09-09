@@ -114,17 +114,13 @@ impl EthVmBackend {
 
         // Determine what type of operation is being performed based on the parameter to in the request object
         let (operation, address) = if let Some(to) = req.to {
-            (Operation::Call, H160 { 0: to.0 })
+            (Operation::Call, to)
         } else {
             (Operation::Create, H160::default())
         };
 
-        let caller = H160 {
-            0: req.from.unwrap_or_default().0,
-        };
-        let value = U256 {
-            0: req.value.unwrap_or_default().0,
-        };
+        let caller = req.from.unwrap_or_default();
+        let value = req.value.unwrap_or_default();
         let data = req.data.unwrap_or_default();
 
         // This parameter is used as the divisor and cannot be 0
@@ -215,6 +211,21 @@ impl EthVmBackend {
             Err(anyhow::Error::msg(""))
         }
     }
+
+    fn select_height(&self, num: Option<U256>) -> u32 {
+        if let Some(h) = num {
+            h.as_u32()
+        } else {
+            if let Some(rh) = self.rollback_height {
+                rh
+            } else {
+                self.gen_getter(None)
+                    .map_err(|e| error!("{:?}", e))
+                    .map(|g| g.height)
+                    .unwrap_or_default()
+            }
+        }
+    }
 }
 
 impl Backend for EthVmBackend {
@@ -228,28 +239,29 @@ impl Backend for EthVmBackend {
     }
 
     fn block_hash(&self, number: U256) -> H256 {
-        self.get_block_by_number(Some(number.as_u32()))
+        let height = self.select_height(Some(number));
+
+        self.get_block_by_number(Some(height))
             .map_err(|e| error!("{:?}", e))
             .map(|b| b.hash())
             .unwrap_or_default()
     }
 
     fn block_number(&self) -> U256 {
-        if let Ok(getter) = self.gen_getter(None) {
-            U256::from(getter.height)
-        } else {
-            U256::zero()
-        }
+        let height = self.select_height(None);
+        U256::from(height)
     }
 
     fn block_coinbase(&self) -> H160 {
-        self.get_block_proposer(None)
+        let height = self.select_height(None);
+        self.get_block_proposer(Some(height))
             .map_err(|e| error!("{:?}", e))
             .unwrap_or_default()
     }
 
     fn block_timestamp(&self) -> U256 {
-        self.get_block_by_number(None)
+        let height = self.select_height(None);
+        self.get_block_by_number(Some(height))
             .map_err(|e| error!("{:?}", e))
             .map(|b| b.time())
             .unwrap_or_default()
@@ -261,7 +273,8 @@ impl Backend for EthVmBackend {
     }
 
     fn block_gas_limit(&self) -> U256 {
-        self.get_block_by_number(None)
+        let height = self.select_height(None);
+        self.get_block_by_number(Some(height))
             .map_err(|e| error!("{:?}", e))
             .map(|b| b.limit())
             .unwrap_or_default()
@@ -277,7 +290,8 @@ impl Backend for EthVmBackend {
     }
 
     fn exists(&self, address: H160) -> bool {
-        if let Ok(mut getter) = self.gen_getter(None) {
+        let height = self.select_height(None);
+        if let Ok(mut getter) = self.gen_getter(Some(height)) {
             getter
                 .get_account_basic(address)
                 .map_err(|e| error!("{:?}", e))
@@ -295,7 +309,8 @@ impl Backend for EthVmBackend {
     }
 
     fn basic(&self, address: H160) -> Basic {
-        if let Ok(mut getter) = self.gen_getter(None) {
+        let height = self.select_height(None);
+        if let Ok(mut getter) = self.gen_getter(Some(height)) {
             getter
                 .get_account_basic(address)
                 .map_err(|e| error!("{:?}", e))
@@ -310,7 +325,8 @@ impl Backend for EthVmBackend {
     }
 
     fn code(&self, address: H160) -> Vec<u8> {
-        if let Ok(mut getter) = self.gen_getter(None) {
+        let height = self.select_height(None);
+        if let Ok(mut getter) = self.gen_getter(Some(height)) {
             getter
                 .get_account_basic(address)
                 .map_err(|e| error!("{:?}", e))
@@ -322,7 +338,8 @@ impl Backend for EthVmBackend {
     }
 
     fn storage(&self, address: H160, index: H256) -> H256 {
-        if let Ok(mut getter) = self.gen_getter(None) {
+        let height = self.select_height(None);
+        if let Ok(mut getter) = self.gen_getter(Some(height)) {
             getter
                 .get_state(address, index)
                 .map_err(|e| error!("{:?}", e))
