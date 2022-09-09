@@ -9,7 +9,6 @@ use evm_exporter::Block;
 use evm_exporter::{Getter, PREFIX};
 use log::error;
 use once_cell::sync::Lazy;
-// use ovr_ruc::{alt, min};
 use ovr_ruc::*;
 use primitive_types::{H160, H256, U256};
 use redis::{Client, Commands, Connection, ConnectionLike};
@@ -69,7 +68,8 @@ impl EthVmBackend {
     }
 
     fn load_block_height_hash_map(&mut self) -> Result<()> {
-        let current_block = self.get_block_by_number(None).c(d!())?;
+        let height = self.select_height(None);
+        let current_block = self.get_block_by_number(height).c(d!())?;
         let current_height = current_block.height();
         let current_hash = current_block.hash();
 
@@ -80,7 +80,7 @@ impl EthVmBackend {
         m2.insert(current_hash, current_height);
 
         for i in (0..current_height).rev() {
-            let block = self.get_block_by_number(Some(i)).c(d!())?;
+            let block = self.get_block_by_number(i).c(d!())?;
             let height = block.height();
             let hash = block.hash();
 
@@ -171,14 +171,7 @@ impl EthVmBackend {
         }
     }
 
-    pub fn get_block_by_number(&self, height: Option<u32>) -> Result<Block> {
-        let height = if let Some(h) = height {
-            h
-        } else {
-            let getter = self.gen_getter(None).c(d!())?;
-            getter.height
-        };
-
+    pub fn get_block_by_number(&self, height: u32) -> Result<Block> {
         let mut con = self.cli.get_connection().c(d!())?;
         let block_key = format!("block:{}", height);
         let val: Option<String> = con.get(block_key).c(d!())?;
@@ -190,14 +183,7 @@ impl EthVmBackend {
         }
     }
 
-    pub fn get_block_proposer(&self, height: Option<u32>) -> Result<H160> {
-        let height = if let Some(h) = height {
-            h
-        } else {
-            let getter = self.gen_getter(None).c(d!())?;
-            getter.height
-        };
-
+    pub fn get_block_proposer(&self, height: u32) -> Result<H160> {
         let url = format!("{}/block?height={}", self.upstream, height);
         let resp = reqwest::blocking::get(url)
             .c(d!())?
@@ -241,7 +227,7 @@ impl Backend for EthVmBackend {
     fn block_hash(&self, number: U256) -> H256 {
         let height = self.select_height(Some(number));
 
-        self.get_block_by_number(Some(height))
+        self.get_block_by_number(height)
             .map_err(|e| error!("{:?}", e))
             .map(|b| b.hash())
             .unwrap_or_default()
@@ -254,14 +240,14 @@ impl Backend for EthVmBackend {
 
     fn block_coinbase(&self) -> H160 {
         let height = self.select_height(None);
-        self.get_block_proposer(Some(height))
+        self.get_block_proposer(height)
             .map_err(|e| error!("{:?}", e))
             .unwrap_or_default()
     }
 
     fn block_timestamp(&self) -> U256 {
         let height = self.select_height(None);
-        self.get_block_by_number(Some(height))
+        self.get_block_by_number(height)
             .map_err(|e| error!("{:?}", e))
             .map(|b| b.time())
             .unwrap_or_default()
@@ -274,7 +260,7 @@ impl Backend for EthVmBackend {
 
     fn block_gas_limit(&self) -> U256 {
         let height = self.select_height(None);
-        self.get_block_by_number(Some(height))
+        self.get_block_by_number(height)
             .map_err(|e| error!("{:?}", e))
             .map(|b| b.limit())
             .unwrap_or_default()
