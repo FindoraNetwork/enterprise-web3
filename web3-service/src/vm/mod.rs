@@ -9,7 +9,8 @@ use evm_exporter::Block;
 use evm_exporter::{Getter, PREFIX};
 use log::error;
 use once_cell::sync::Lazy;
-use ovr_ruc::{alt, min};
+// use ovr_ruc::{alt, min};
+use ovr_ruc::*;
 use primitive_types::{H160, H256, U256};
 use redis::{Client, Commands, Connection, ConnectionLike};
 use serde_json::Value;
@@ -52,13 +53,8 @@ impl Clone for EthVmBackend {
 }
 
 impl EthVmBackend {
-    pub fn new(
-        gas_price: u64,
-        redis_addr: &str,
-        upstream: &str,
-        chain_id: u32,
-    ) -> anyhow::Result<Self> {
-        let cli = Client::open(redis_addr)?;
+    pub fn new(gas_price: u64, redis_addr: &str, upstream: &str, chain_id: u32) -> Result<Self> {
+        let cli = Client::open(redis_addr).c(d!())?;
         let mut eb = Self {
             gas_price: U256::from(gas_price),
             cli,
@@ -68,12 +64,12 @@ impl EthVmBackend {
             height_hash_map: HashMap::new(),
             hash_height_map: HashMap::new(),
         };
-        eb.load_block_height_hash_map()?;
+        eb.load_block_height_hash_map().c(d!())?;
         Ok(eb)
     }
 
-    fn load_block_height_hash_map(&mut self) -> anyhow::Result<()> {
-        let current_block = self.get_block_by_number(None)?;
+    fn load_block_height_hash_map(&mut self) -> Result<()> {
+        let current_block = self.get_block_by_number(None).c(d!())?;
         let current_height = current_block.height();
         let current_hash = current_block.hash();
 
@@ -84,7 +80,7 @@ impl EthVmBackend {
         m2.insert(current_hash, current_height);
 
         for i in (0..current_height).rev() {
-            let block = self.get_block_by_number(Some(i))?;
+            let block = self.get_block_by_number(Some(i)).c(d!())?;
             let height = block.height();
             let hash = block.hash();
 
@@ -103,7 +99,7 @@ impl EthVmBackend {
         req: CallRequest,
         bn: Option<BlockNumber>,
         ct: Option<ConfigType>,
-    ) -> anyhow::Result<(ExitReason, Vec<u8>)> {
+    ) -> Result<(ExitReason, Vec<u8>)> {
         static U64_MAX: Lazy<U256> = Lazy::new(|| U256::from(u64::MAX));
 
         // Operation Type
@@ -149,7 +145,7 @@ impl EthVmBackend {
 
         let metadata = StackSubstateMetadata::new(u64::MAX, &cfg);
 
-        let rollback_height = block_number_to_height(bn, self)?;
+        let rollback_height = block_number_to_height(bn, self).c(d!())?;
         let mut backend = self.clone();
         backend.rollback_height = Some(rollback_height);
         let stack = MemoryStackState::new(metadata, &backend);
@@ -166,49 +162,53 @@ impl EthVmBackend {
         Ok(resp)
     }
 
-    pub fn gen_getter(&self, height: Option<u32>) -> anyhow::Result<Getter<Connection>> {
-        let con = self.cli.get_connection()?;
+    pub fn gen_getter(&self, height: Option<u32>) -> Result<Getter<Connection>> {
+        let con = self.cli.get_connection().c(d!())?;
         if let Some(h) = height {
             Ok(Getter::new_with_height(con, PREFIX.to_string(), h))
         } else {
-            Getter::new(con, PREFIX.to_string()).map_err(|e| anyhow::Error::msg(e))
+            Getter::new(con, PREFIX.to_string()).c(d!())
         }
     }
 
-    pub fn get_block_by_number(&self, height: Option<u32>) -> anyhow::Result<Block> {
+    pub fn get_block_by_number(&self, height: Option<u32>) -> Result<Block> {
         let height = if let Some(h) = height {
             h
         } else {
-            let getter = self.gen_getter(None)?;
+            let getter = self.gen_getter(None).c(d!())?;
             getter.height
         };
-        let mut con = self.cli.get_connection()?;
+
+        let mut con = self.cli.get_connection().c(d!())?;
         let block_key = format!("block:{}", height);
-        let val: Option<String> = con.get(block_key)?;
+        let val: Option<String> = con.get(block_key).c(d!())?;
         if let Some(val) = val {
-            let block = serde_json::from_str::<Block>(&val)?;
+            let block = serde_json::from_str::<Block>(&val).c(d!())?;
             Ok(block)
         } else {
-            Err(anyhow::Error::msg(""))
+            Err(eg!())
         }
     }
 
-    pub fn get_block_proposer(&self, height: Option<u32>) -> anyhow::Result<H160> {
+    pub fn get_block_proposer(&self, height: Option<u32>) -> Result<H160> {
         let height = if let Some(h) = height {
             h
         } else {
-            let getter = self.gen_getter(None)?;
+            let getter = self.gen_getter(None).c(d!())?;
             getter.height
         };
 
         let url = format!("{}/block?height={}", self.upstream, height);
-        let resp = reqwest::blocking::get(url)?.json::<Value>()?;
+        let resp = reqwest::blocking::get(url)
+            .c(d!())?
+            .json::<Value>()
+            .c(d!())?;
         if let Some(proposer_address) =
             resp["result"]["block"]["header"]["proposer_address"].as_str()
         {
-            Ok(H160::from_str(proposer_address)?)
+            Ok(H160::from_str(proposer_address).c(d!())?)
         } else {
-            Err(anyhow::Error::msg(""))
+            Err(eg!())
         }
     }
 

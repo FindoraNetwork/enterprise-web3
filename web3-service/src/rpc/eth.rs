@@ -4,6 +4,7 @@ use evm::backend::{Backend, Basic, MemoryBackend};
 use evm::executor::stack::MemoryStackState;
 use evm_exporter::Getter;
 use jsonrpc_core::*;
+use ovr_ruc::{d, RucResult};
 use redis::{Client, ConnectionLike};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -20,8 +21,8 @@ impl EthService {
         redis_addr: &str,
         upstream: &str,
         chain_id: u32,
-    ) -> anyhow::Result<Self> {
-        let backend = EthVmBackend::new(gas_price, redis_addr, upstream, chain_id)?;
+    ) -> ovr_ruc::Result<Self> {
+        let backend = EthVmBackend::new(gas_price, redis_addr, upstream, chain_id).c(d!())?;
         Ok(Self {
             eth_vm_backend: backend,
         })
