@@ -183,7 +183,7 @@ impl EthVmBackend {
         }
     }
 
-    pub fn get_block_proposer(&self, height: u32) -> Result<H160> {
+    fn get_block_proposer(&self, height: u32) -> Result<H160> {
         let url = format!("{}/block?height={}", self.upstream, height);
         let resp = reqwest::blocking::get(url)
             .c(d!())?

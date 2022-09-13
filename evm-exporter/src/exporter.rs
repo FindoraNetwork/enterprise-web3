@@ -2,7 +2,7 @@ use primitive_types::{H160, H256, U256};
 use redis::{Commands, ConnectionLike};
 use redis_versioned_kv::VersionedKVCommand;
 
-use crate::{keys, AccountBasic, Result};
+use crate::{keys, AccountBasic, Block, Result, Transaction};
 
 pub struct Exporter<C> {
     conn: C,
@@ -19,12 +19,12 @@ impl<C: ConnectionLike> Exporter<C> {
         }
     }
 
-    pub fn begin_block(&mut self, height: u32) -> Result<()> {
+    pub fn begin_block(&mut self, height: u32, _block: Block) -> Result<()> {
         self.height = height;
         Ok(())
     }
 
-    pub fn end_block(&mut self) -> Result<()> {
+    pub fn end_block(&mut self, _block: Block) -> Result<()> {
         // Set current key here.
         let height_key = keys::latest_height_key(&self.prefix);
 
@@ -33,15 +33,15 @@ impl<C: ConnectionLike> Exporter<C> {
         Ok(())
     }
 
-    pub fn beigin_transaction(&mut self, _hash: Vec<u8>) -> Result<()> {
+    pub fn begin_transaction(&mut self, _hash: Vec<u8>, _tx: Transaction) -> Result<()> {
         Ok(())
     }
 
-    pub fn end_transaction(&mut self, _hash: Vec<u8>) -> Result<()> {
+    pub fn end_transaction(&mut self, _hash: Vec<u8>, _tx: Transaction) -> Result<()> {
         Ok(())
     }
 
-    pub fn add_receipt(&mut self, _txhash: Vec<u8>) -> Result<()> {
+    pub fn add_receipt(&mut self, _txhash: Vec<u8>, _tx: Transaction) -> Result<()> {
         Ok(())
     }
 

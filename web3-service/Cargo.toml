@@ -14,7 +14,7 @@ redis = { version = "0.21" }
 redis-versioned-kv = { path = "../redis-versioned-kv" }
 evm-exporter = { path = "../evm-exporter" }
 tokio = { version = "1.21.0", features = ["full"] }
-web3-rpc-core = { git = "https://github.com/malefooo/web3-rpc.git" ,branch = "patch-1"}
+web3-rpc-core = { git = "https://github.com/FindoraNetwork/web3-rpc.git"}
 jsonrpc-http-server = "18.0"
 jsonrpc-ws-server = "18.0"
 jsonrpc-core = "18.0"
