@@ -1,8 +1,9 @@
+use ethereum::ReceiptV0;
 use primitive_types::{H160, H256, U256};
 use redis::{Commands, ConnectionLike};
 use redis_versioned_kv::VersionedKVCommand;
 
-use crate::{keys, AccountBasic, Block, Result, Transaction};
+use crate::{keys, AccountBasic, Block, Receipt, Result, Transaction};
 
 pub struct Exporter<C> {
     conn: C,
@@ -24,7 +25,7 @@ impl<C: ConnectionLike> Exporter<C> {
         Ok(())
     }
 
-    pub fn end_block(&mut self, _block: Block) -> Result<()> {
+    pub fn end_block(&mut self, height: u32) -> Result<()> {
         // Set current key here.
         let height_key = keys::latest_height_key(&self.prefix);
 
@@ -41,7 +42,7 @@ impl<C: ConnectionLike> Exporter<C> {
         Ok(())
     }
 
-    pub fn add_receipt(&mut self, _txhash: Vec<u8>, _tx: Transaction) -> Result<()> {
+    pub fn add_receipt(&mut self, _txhash: Vec<u8>, _receipt: Receipt) -> Result<()> {
         Ok(())
     }
 

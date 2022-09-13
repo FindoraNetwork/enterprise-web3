@@ -70,8 +70,8 @@ impl EthVmBackend {
     fn load_block_height_hash_map(&mut self) -> Result<()> {
         let height = self.select_height(None);
         let current_block = self.get_block_by_number(height).c(d!())?;
-        let current_height = current_block.height();
-        let current_hash = current_block.hash();
+        let current_height = current_block.header.number.as_u32();
+        let current_hash = current_block.header.hash();
 
         let mut m1 = HashMap::new();
         let mut m2 = HashMap::new();
@@ -81,8 +81,8 @@ impl EthVmBackend {
 
         for i in (0..current_height).rev() {
             let block = self.get_block_by_number(i).c(d!())?;
-            let height = block.height();
-            let hash = block.hash();
+            let height = block.header.number.as_u32();
+            let hash = block.header.hash();
 
             m1.insert(height, hash);
             m2.insert(hash, height);
@@ -229,7 +229,7 @@ impl Backend for EthVmBackend {
 
         self.get_block_by_number(height)
             .map_err(|e| error!("{:?}", e))
-            .map(|b| b.hash())
+            .map(|b| b.header.hash())
             .unwrap_or_default()
     }
 
@@ -249,7 +249,7 @@ impl Backend for EthVmBackend {
         let height = self.select_height(None);
         self.get_block_by_number(height)
             .map_err(|e| error!("{:?}", e))
-            .map(|b| b.time())
+            .map(|b| U256::from(b.header.timestamp))
             .unwrap_or_default()
     }
 
@@ -262,7 +262,7 @@ impl Backend for EthVmBackend {
         let height = self.select_height(None);
         self.get_block_by_number(height)
             .map_err(|e| error!("{:?}", e))
-            .map(|b| b.limit())
+            .map(|b| b.header.gas_limit)
             .unwrap_or_default()
     }
 
