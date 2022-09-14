@@ -26,3 +26,10 @@ pub struct Transaction {
     pub logs: Vec<Log>,
     pub logs_bloom: Bloom,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct State {
+    pub height: u32,
+    pub address: H160,
+    pub index: H256,
+}
