@@ -32,4 +32,5 @@ pub struct State {
     pub height: u32,
     pub address: H160,
     pub index: H256,
+    pub value: H256,
 }
