@@ -28,3 +28,11 @@ pub fn state_key(prefix: &str, addr: H160, index: H256) -> String {
 pub fn latest_height_key(prefix: &str) -> String {
     format!("{}:height", prefix)
 }
+
+pub fn tx_key(prefix: &str) -> String {
+    format!("{}:tx", prefix)
+}
+
+pub fn block_key(prefix: &str) -> String {
+    format!("{}:block", prefix)
+}
