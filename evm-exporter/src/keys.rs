@@ -29,8 +29,8 @@ pub fn latest_height_key(prefix: &str) -> String {
     format!("{}:height", prefix)
 }
 
-pub fn tx_key(prefix: &str) -> String {
-    format!("{}:tx", prefix)
+pub fn tx_key(prefix: &str, tx_hash: H256) -> String {
+    format!("{}:tx:hash.{}", prefix, hex::encode(tx_hash))
 }
 
 pub fn block_key(prefix: &str) -> String {
