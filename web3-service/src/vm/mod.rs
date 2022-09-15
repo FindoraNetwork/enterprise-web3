@@ -5,7 +5,7 @@ use crate::vm::precompile::PRECOMPILE_SET;
 use evm::backend::{Backend, Basic};
 use evm::executor::stack::{MemoryStackState, PrecompileSet, StackExecutor, StackSubstateMetadata};
 use evm::ExitReason;
-use evm_exporter::Block;
+use evm_exporter::{Block, keys, Transaction};
 use evm_exporter::{Getter, PREFIX};
 use log::error;
 use once_cell::sync::Lazy;
@@ -26,8 +26,10 @@ pub struct EthVmBackend {
     upstream: String,
     chain_id: u32,
     rollback_height: Option<u32>,
-    pub height_hash_map: HashMap<u32, H256>,
-    pub hash_height_map: HashMap<H256, u32>,
+    pub block_height_hash_map: HashMap<u32, H256>,
+    pub block_hash_height_map: HashMap<H256, u32>,
+    pub tx_hash_height_map: HashMap<H256, u32>,
+    pub tx_height_hash_map: HashMap<u32, Vec<H256>>,
 }
 
 pub enum ConfigType {
@@ -45,8 +47,10 @@ impl Clone for EthVmBackend {
             upstream: self.upstream.clone(),
             chain_id: self.chain_id,
             rollback_height: self.rollback_height.clone(),
-            height_hash_map: Default::default(),
-            hash_height_map: Default::default(),
+            block_height_hash_map: Default::default(),
+            block_hash_height_map: Default::default(),
+            tx_hash_height_map: Default::default(),
+            tx_height_hash_map: Default::default()
         }
     }
 }
@@ -60,38 +64,63 @@ impl EthVmBackend {
             upstream: upstream.to_string(),
             chain_id,
             rollback_height: None,
-            height_hash_map: HashMap::new(),
-            hash_height_map: HashMap::new(),
+            block_height_hash_map: Default::default(),
+            block_hash_height_map: Default::default(),
+            tx_hash_height_map: Default::default(),
+            tx_height_hash_map: Default::default()
         };
-        eb.load_block_height_hash_map().c(d!())?;
+        eb.load_his_data().c(d!())?;
         Ok(eb)
     }
 
-    fn load_block_height_hash_map(&mut self) -> Result<()> {
+    fn load_his_data(&mut self) -> Result<()> {
         let height = self.select_height(None);
         let current_block = self.get_block_by_number(height).c(d!())?;
         let current_height = current_block.header.number.as_u32();
-        let current_hash = current_block.header.hash();
 
         let mut m1 = HashMap::new();
         let mut m2 = HashMap::new();
 
-        m1.insert(current_height, current_hash);
-        m2.insert(current_hash, current_height);
+        let mut txm1 = HashMap::new();
+        let mut txm2 = HashMap::new();
 
-        for i in (0..current_height).rev() {
+        for i in (0..=current_height).rev() {
             let block = self.get_block_by_number(i).c(d!())?;
             let height = block.header.number.as_u32();
             let hash = block.header.hash();
+
+            let mut txs = vec![];
+            for transaction in block.transactions.iter() {
+                let tx_hash = transaction.hash();
+                self.get_tx_by_hash(tx_hash).c(d!("redis not exist this transaction data"))?;
+                txs.push(tx_hash);
+                txm1.insert(tx_hash, height);
+            }
+            txm2.insert(height, txs);
 
             m1.insert(height, hash);
             m2.insert(hash, height);
         }
 
-        self.height_hash_map = m1;
-        self.hash_height_map = m2;
+        self.block_height_hash_map = m1;
+        self.block_hash_height_map = m2;
+
+        self.tx_hash_height_map = txm1;
+        self.tx_height_hash_map = txm2;
 
         Ok(())
+    }
+
+    pub fn get_tx_by_hash(&self, tx_hash: H256) -> Result<Transaction> {
+        let mut con = self.cli.get_connection().c(d!())?;
+        let tx_key = keys::tx_key(PREFIX, tx_hash);
+        let val: Option<String> = con.get(tx_key).c(d!())?;
+        if let Some(val) = val {
+            let tx = serde_json::from_str::<Transaction>(&val).c(d!())?;
+            Ok(tx)
+        } else {
+            Err(eg!())
+        }
     }
 
     pub fn contract_handle(
@@ -173,7 +202,7 @@ impl EthVmBackend {
 
     pub fn get_block_by_number(&self, height: u32) -> Result<Block> {
         let mut con = self.cli.get_connection().c(d!())?;
-        let block_key = format!("block:{}", height);
+        let block_key = keys::block_key(PREFIX, height);
         let val: Option<String> = con.get(block_key).c(d!())?;
         if let Some(val) = val {
             let block = serde_json::from_str::<Block>(&val).c(d!())?;

@@ -16,7 +16,7 @@ pub fn block_number_to_height(bn: Option<BlockNumber>, backend: &EthVmBackend) -
             hash,
             require_canonical: _,
         } => {
-            if let Some(h) = backend.hash_height_map.get(&hash) {
+            if let Some(h) = backend.block_hash_height_map.get(&hash) {
                 *h
             } else {
                 return Err(eg!());

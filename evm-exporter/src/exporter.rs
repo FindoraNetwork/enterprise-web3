@@ -75,4 +75,16 @@ impl<C: ConnectionLike> Exporter<C> {
 
         Ok(())
     }
+
+    pub fn update_tx(&mut self, tx: &Transaction) -> Result<()> {
+        let tx_key = keys::tx_key(&self.prefix, tx.transaction_hash);
+        self.conn.set(tx_key, serde_json::to_string(tx)?)?;
+        Ok(())
+    }
+
+    pub fn update_block(&mut self, block: &Block, height: u32) -> Result<()> {
+        let block_key = keys::block_key(&self.prefix, height);
+        self.conn.set(block_key, serde_json::to_string(block)?)?;
+        Ok(())
+    }
 }

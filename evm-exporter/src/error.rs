@@ -13,6 +13,9 @@ pub enum Error {
 
     #[error("Slice length mismatch")]
     LengthMismatch,
+
+    #[error(transparent)]
+    SerdeJsonError(#[from] serde_json::Error)
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

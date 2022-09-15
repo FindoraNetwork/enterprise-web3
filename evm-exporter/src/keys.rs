@@ -33,6 +33,6 @@ pub fn tx_key(prefix: &str, tx_hash: H256) -> String {
     format!("{}:tx:hash.{}", prefix, hex::encode(tx_hash))
 }
 
-pub fn block_key(prefix: &str) -> String {
-    format!("{}:block", prefix)
+pub fn block_key(prefix: &str, height: u32) -> String {
+    format!("{}:block:{}", prefix, height)
 }
