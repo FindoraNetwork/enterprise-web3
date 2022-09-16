@@ -1,5 +1,5 @@
 use primitive_types::{H160, H256, U256};
-use redis::ConnectionLike;
+use redis::{Commands, ConnectionLike};
 use redis_versioned_kv::VersionedKVCommand;
 
 use crate::{keys, AccountBasic, Error, Result};
@@ -34,7 +34,12 @@ impl<C: ConnectionLike> Getter<C> {
     }
 
     pub fn latest_height(&mut self) -> Result<u32> {
-        Ok(0)
+        let height_key = keys::latest_height_key(&self.prefix);
+        let height: Option<String> = self.conn.get(height_key)?;
+        match height {
+            Some(str) => Ok(str.parse::<u32>().map_err(|e| Error::ParseIntError(e))?),
+            _ => Ok(0),
+        }
     }
 
     pub fn get_account_basic(&mut self, address: H160) -> Result<AccountBasic> {
@@ -89,5 +94,25 @@ impl<C: ConnectionLike> Getter<C> {
         };
 
         Ok(h)
+    }
+
+    pub fn get_block_hash_by_height(&mut self, height: U256) -> Result<Option<H256>> {
+        let block_hash_key = keys::block_hash_key(&self.prefix, height);
+        let value: Option<String> = self.conn.get::<&str, Option<String>>(&block_hash_key)?;
+        if let Some(hash) = value {
+            Ok(Some(serde_json::from_slice::<H256>(hash.as_bytes())?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_height_by_block_hash(&mut self, block_hash: H256) -> Result<Option<U256>> {
+        let block_height_key = keys::block_height_key(&self.prefix, block_hash);
+        let value: Option<String> = self.conn.get::<&str, Option<String>>(&block_height_key)?;
+        if let Some(hash) = value {
+            Ok(Some(serde_json::from_slice::<U256>(hash.as_bytes())?))
+        } else {
+            Ok(None)
+        }
     }
 }

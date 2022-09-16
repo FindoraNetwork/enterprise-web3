@@ -82,15 +82,16 @@ impl<C: ConnectionLike> Exporter<C> {
         Ok(())
     }
 
-    pub fn update_block(&mut self, block: &Block, height: u32) -> Result<()> {
-        let block_key = keys::block_key(&self.prefix, height);
+    pub fn update_block(&mut self, block: &Block) -> Result<()> {
+        let block_key = keys::block_key(&self.prefix, block.header.hash());
         self.conn.set(block_key, serde_json::to_string(block)?)?;
         Ok(())
     }
 
     pub fn update_receipt(&mut self, receipt: &Receipt, tx_hash: H256) -> Result<()> {
         let receipt_key = keys::receipt_key(&self.prefix, tx_hash);
-        self.conn.set(receipt_key, serde_json::to_string(receipt)?)?;
+        self.conn
+            .set(receipt_key, serde_json::to_string(receipt)?)?;
         Ok(())
     }
 }

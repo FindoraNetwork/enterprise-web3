@@ -33,10 +33,34 @@ pub fn tx_state_key(prefix: &str, tx_hash: H256) -> String {
     format!("{}:tx_state:hash.{}", prefix, hex::encode(tx_hash))
 }
 
-pub fn block_key(prefix: &str, height: u32) -> String {
-    format!("{}:block:{}", prefix, height)
+pub fn block_key(prefix: &str, block_hash: H256) -> String {
+    format!("{}:block:block_hash.{:?}", prefix, hex::encode(block_hash))
 }
 
 pub fn receipt_key(prefix: &str, tx_hash: H256) -> String {
     format!("{}:receipt:tx_hash.{}", prefix, hex::encode(tx_hash))
+}
+
+pub fn block_hash_key(prefix: &str, height: U256) -> String {
+    format!("{}:block_hash:height.{:?}", prefix, hex_u256(height))
+}
+
+pub fn block_height_key(prefix: &str, block_hash: H256) -> String {
+    format!("{}:block_height:hash.{:?}", prefix, hex::encode(block_hash))
+}
+
+pub fn status_key(prefix: &str, block_hash: H256) -> String {
+    format!("{}:status:block_hash.{:?}", prefix, hex::encode(block_hash))
+}
+
+pub fn transaction_index_key(prefix: &str, tx_hash: H256) -> String {
+    format!("{}:tx_index_key:tx_hash.{:?}", prefix, hex::encode(tx_hash))
+}
+pub fn account_storage_key(prefix: &str, addr: H160, index: H256) -> String {
+    format!(
+        "{}:account_storage:addr.{}_index.{}",
+        prefix,
+        hex::encode(addr),
+        hex::encode(index)
+    )
 }

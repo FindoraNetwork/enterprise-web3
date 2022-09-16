@@ -5,7 +5,7 @@ use crate::vm::precompile::PRECOMPILE_SET;
 use evm::backend::{Backend, Basic};
 use evm::executor::stack::{MemoryStackState, PrecompileSet, StackExecutor, StackSubstateMetadata};
 use evm::ExitReason;
-use evm_exporter::{Block, keys, Transaction};
+use evm_exporter::{keys, Block, Transaction};
 use evm_exporter::{Getter, PREFIX};
 use log::error;
 use once_cell::sync::Lazy;
@@ -50,7 +50,7 @@ impl Clone for EthVmBackend {
             block_height_hash_map: Default::default(),
             block_hash_height_map: Default::default(),
             tx_hash_height_map: Default::default(),
-            tx_height_hash_map: Default::default()
+            tx_height_hash_map: Default::default(),
         }
     }
 }
@@ -67,7 +67,7 @@ impl EthVmBackend {
             block_height_hash_map: Default::default(),
             block_hash_height_map: Default::default(),
             tx_hash_height_map: Default::default(),
-            tx_height_hash_map: Default::default()
+            tx_height_hash_map: Default::default(),
         };
         eb.load_his_data().c(d!())?;
         Ok(eb)
@@ -92,7 +92,8 @@ impl EthVmBackend {
             let mut txs = vec![];
             for transaction in block.transactions.iter() {
                 let tx_hash = transaction.hash();
-                self.get_tx_by_hash(tx_hash).c(d!("redis not exist this transaction data"))?;
+                self.get_tx_by_hash(tx_hash)
+                    .c(d!("redis not exist this transaction data"))?;
                 txs.push(tx_hash);
                 txm1.insert(tx_hash, height);
             }
@@ -201,15 +202,16 @@ impl EthVmBackend {
     }
 
     pub fn get_block_by_number(&self, height: u32) -> Result<Block> {
-        let mut con = self.cli.get_connection().c(d!())?;
-        let block_key = keys::block_key(PREFIX, height);
-        let val: Option<String> = con.get(block_key).c(d!())?;
-        if let Some(val) = val {
-            let block = serde_json::from_str::<Block>(&val).c(d!())?;
-            Ok(block)
-        } else {
-            Err(eg!())
-        }
+        todo!("{}", height);
+        // let mut con = self.cli.get_connection().c(d!())?;
+        // let block_key = keys::block_key(PREFIX, height);
+        // let val: Option<String> = con.get(block_key).c(d!())?;
+        // if let Some(val) = val {
+        //     let block = serde_json::from_str::<Block>(&val).c(d!())?;
+        //     Ok(block)
+        // } else {
+        //     Err(eg!())
+        // }
     }
 
     fn get_block_proposer(&self, height: u32) -> Result<H160> {

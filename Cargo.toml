@@ -2,5 +2,6 @@
 members = [
     "redis-versioned-kv",
     "evm-exporter",
+    "rocksdb-exporter",
     "web3-service",
 ]
