@@ -113,7 +113,7 @@ impl EthVmBackend {
 
     pub fn get_tx_by_hash(&self, tx_hash: H256) -> Result<Transaction> {
         let mut con = self.cli.get_connection().c(d!())?;
-        let tx_key = keys::tx_key(PREFIX, tx_hash);
+        let tx_key = keys::tx_state_key(PREFIX, tx_hash);
         let val: Option<String> = con.get(tx_key).c(d!())?;
         if let Some(val) = val {
             let tx = serde_json::from_str::<Transaction>(&val).c(d!())?;

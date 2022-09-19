@@ -29,10 +29,14 @@ pub fn latest_height_key(prefix: &str) -> String {
     format!("{}:height", prefix)
 }
 
-pub fn tx_key(prefix: &str, tx_hash: H256) -> String {
-    format!("{}:tx:hash.{}", prefix, hex::encode(tx_hash))
+pub fn tx_state_key(prefix: &str, tx_hash: H256) -> String {
+    format!("{}:tx_state:hash.{}", prefix, hex::encode(tx_hash))
 }
 
 pub fn block_key(prefix: &str, height: u32) -> String {
     format!("{}:block:{}", prefix, height)
+}
+
+pub fn receipt_key(prefix: &str, tx_hash: H256) -> String {
+    format!("{}:receipt:tx_hash.{}", prefix, hex::encode(tx_hash))
 }
