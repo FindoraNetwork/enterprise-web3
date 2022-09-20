@@ -10,19 +10,38 @@ primitive-types = "0.11.1"
 ethereum-types = "0.13.1"
 evm = { version = "0.35.0", default-features = false, features = ["with-serde"] }
 ethereum = { version = "0.12.0", default-features = false, features = ["with-serde"] }
-redis = { version = "0.21" }
-redis-versioned-kv = { path = "../redis-versioned-kv" }
 evm-exporter = { path = "../evm-exporter" }
-tokio = { version = "1.21.0", features = ["full"] }
+
+libsecp256k1 = { version = "0.5", features = ["static-context", "hmac"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
 web3-rpc-core = { git = "https://github.com/FindoraNetwork/web3-rpc.git"}
 jsonrpc-http-server = "18.0"
 jsonrpc-ws-server = "18.0"
 jsonrpc-core = "18.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+jsonrpc-pubsub = "18.0"
+
+redis = { version = "0.21", default-features = false, features = [ "tls"] }
+tokio = { version = "1.21.0", features = ["full"] }
 env_logger = "0.9.0"
 log = "0.4.14"
 reqwest = { version = "0.11", features = ["json", "native-tls-vendored", "blocking"] }
 ovr-eth-utils = { git = "https://github.com/Overealityio/ovr-eth-utils", rev = "ca83d6adb0396c06e05d1fd4c18a371de163ed58", features = ["with_common_precompiles"] }
+
+tendermint = { git = "https://github.com/FindoraNetwork/tendermint-rs", tag = "v0.19.0a-fk" }
+tendermint-rpc = { git = "https://github.com/FindoraNetwork/tendermint-rs", features = ["http-client", "websocket-client"], tag = "v0.19.0a-fk" }
+
+lazy_static = "1.4.0"
 once_cell = "1.10.0"
-ovr-ruc  = {version = "1.0.8", features = ["cmd"] }
+ruc = "2.0"
+rlp = "0.5"
+sha3 = "0.8"
+hex = "0.4.3"
+num_cpus = "1.13"
+futures = "0.3.16"
+toml = "0.5.8"
+
+[features]
+default = []
+cluster_redis = ["redis/cluster"]
