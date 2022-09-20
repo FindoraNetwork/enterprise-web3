@@ -11,3 +11,6 @@ pub use exporter::*;
 
 mod getter;
 pub use getter::*;
+
+mod setter;
+pub use setter::*;
