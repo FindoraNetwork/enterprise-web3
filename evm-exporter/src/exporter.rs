@@ -3,7 +3,7 @@ use primitive_types::{H160, H256, U256};
 use redis::{Commands, ConnectionLike};
 use redis_versioned_kv::VersionedKVCommand;
 
-use crate::{keys, AccountBasic, Block, Receipt, Result, Transaction};
+use crate::{keys, AccountBasic, Block, Receipt, Result, TransactionStatus};
 
 pub struct Exporter<C> {
     conn: C,
@@ -34,11 +34,11 @@ impl<C: ConnectionLike> Exporter<C> {
         Ok(())
     }
 
-    pub fn begin_transaction(&mut self, _hash: Vec<u8>, _tx: Transaction) -> Result<()> {
+    pub fn begin_transaction(&mut self, _hash: Vec<u8>, _tx: TransactionStatus) -> Result<()> {
         Ok(())
     }
 
-    pub fn end_transaction(&mut self, _hash: Vec<u8>, _tx: Transaction) -> Result<()> {
+    pub fn end_transaction(&mut self, _hash: Vec<u8>, _tx: TransactionStatus) -> Result<()> {
         Ok(())
     }
 
@@ -76,7 +76,7 @@ impl<C: ConnectionLike> Exporter<C> {
         Ok(())
     }
 
-    pub fn update_tx_state(&mut self, tx: &Transaction) -> Result<()> {
+    pub fn update_tx_state(&mut self, tx: &TransactionStatus) -> Result<()> {
         let tx_state_key = keys::tx_state_key(&self.prefix, tx.transaction_hash);
         self.conn.set(tx_state_key, serde_json::to_string(tx)?)?;
         Ok(())

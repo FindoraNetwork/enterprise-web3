@@ -1,7 +1,7 @@
 use crate::vm::EthVmBackend;
 use evm::backend::Backend;
 use ovr_ruc::*;
-use primitive_types::H256;
+use primitive_types::{H256, U256};
 use web3_rpc_core::types::BlockNumber;
 
 pub fn block_number_to_height(bn: Option<BlockNumber>, backend: &EthVmBackend) -> Result<u32> {
@@ -16,15 +16,16 @@ pub fn block_number_to_height(bn: Option<BlockNumber>, backend: &EthVmBackend) -
             hash,
             require_canonical: _,
         } => {
-            if let Some(h) = backend.block_hash_height_map.get(&hash) {
-                *h
+            let mut getter = backend.gen_getter().c(d!())?;
+            if let Some(h) = getter.get_height_by_block_hash(hash).c(d!())? {
+                h.as_u32()
             } else {
-                return Err(eg!());
+                0
             }
         }
         BlockNumber::Num(num) => num as u32,
         BlockNumber::Latest => {
-            let mut getter = backend.gen_getter(None).c(d!())?;
+            let mut getter = backend.gen_getter().c(d!())?;
             getter.latest_height().c(d!())?
         }
         BlockNumber::Earliest => 1,

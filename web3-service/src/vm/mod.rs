@@ -5,7 +5,7 @@ use crate::vm::precompile::PRECOMPILE_SET;
 use evm::backend::{Backend, Basic};
 use evm::executor::stack::{MemoryStackState, PrecompileSet, StackExecutor, StackSubstateMetadata};
 use evm::ExitReason;
-use evm_exporter::{Block, keys, Transaction};
+use evm_exporter::{Block, keys, TransactionStatus};
 use evm_exporter::{Getter, PREFIX};
 use log::error;
 use once_cell::sync::Lazy;
@@ -26,10 +26,6 @@ pub struct EthVmBackend {
     upstream: String,
     chain_id: u32,
     rollback_height: Option<u32>,
-    pub block_height_hash_map: HashMap<u32, H256>,
-    pub block_hash_height_map: HashMap<H256, u32>,
-    pub tx_hash_height_map: HashMap<H256, u32>,
-    pub tx_height_hash_map: HashMap<u32, Vec<H256>>,
 }
 
 pub enum ConfigType {
@@ -39,21 +35,6 @@ pub enum ConfigType {
     London,
 }
 
-impl Clone for EthVmBackend {
-    fn clone(&self) -> Self {
-        Self {
-            gas_price: self.gas_price,
-            cli: self.cli.clone(),
-            upstream: self.upstream.clone(),
-            chain_id: self.chain_id,
-            rollback_height: self.rollback_height.clone(),
-            block_height_hash_map: Default::default(),
-            block_hash_height_map: Default::default(),
-            tx_hash_height_map: Default::default(),
-            tx_height_hash_map: Default::default()
-        }
-    }
-}
 
 impl EthVmBackend {
     pub fn new(gas_price: u64, redis_addr: &str, upstream: &str, chain_id: u32) -> Result<Self> {
@@ -64,59 +45,16 @@ impl EthVmBackend {
             upstream: upstream.to_string(),
             chain_id,
             rollback_height: None,
-            block_height_hash_map: Default::default(),
-            block_hash_height_map: Default::default(),
-            tx_hash_height_map: Default::default(),
-            tx_height_hash_map: Default::default()
         };
-        eb.load_his_data().c(d!())?;
         Ok(eb)
     }
 
-    fn load_his_data(&mut self) -> Result<()> {
-        let height = self.select_height(None);
-        let current_block = self.get_block_by_number(height).c(d!())?;
-        let current_height = current_block.header.number.as_u32();
-
-        let mut m1 = HashMap::new();
-        let mut m2 = HashMap::new();
-
-        let mut txm1 = HashMap::new();
-        let mut txm2 = HashMap::new();
-
-        for i in (0..=current_height).rev() {
-            let block = self.get_block_by_number(i).c(d!())?;
-            let height = block.header.number.as_u32();
-            let hash = block.header.hash();
-
-            let mut txs = vec![];
-            for transaction in block.transactions.iter() {
-                let tx_hash = transaction.hash();
-                self.get_tx_by_hash(tx_hash).c(d!("redis not exist this transaction data"))?;
-                txs.push(tx_hash);
-                txm1.insert(tx_hash, height);
-            }
-            txm2.insert(height, txs);
-
-            m1.insert(height, hash);
-            m2.insert(hash, height);
-        }
-
-        self.block_height_hash_map = m1;
-        self.block_hash_height_map = m2;
-
-        self.tx_hash_height_map = txm1;
-        self.tx_height_hash_map = txm2;
-
-        Ok(())
-    }
-
-    pub fn get_tx_by_hash(&self, tx_hash: H256) -> Result<Transaction> {
+    pub fn get_tx_by_hash(&self, tx_hash: H256) -> Result<TransactionStatus> {
         let mut con = self.cli.get_connection().c(d!())?;
         let tx_key = keys::tx_state_key(PREFIX, tx_hash);
         let val: Option<String> = con.get(tx_key).c(d!())?;
         if let Some(val) = val {
-            let tx = serde_json::from_str::<Transaction>(&val).c(d!())?;
+            let tx = serde_json::from_str::<TransactionStatus>(&val).c(d!())?;
             Ok(tx)
         } else {
             Err(eg!())
@@ -124,7 +62,7 @@ impl EthVmBackend {
     }
 
     pub fn contract_handle(
-        &self,
+        &mut self,
         req: CallRequest,
         bn: Option<BlockNumber>,
         ct: Option<ConfigType>,
@@ -175,9 +113,8 @@ impl EthVmBackend {
         let metadata = StackSubstateMetadata::new(u64::MAX, &cfg);
 
         let rollback_height = block_number_to_height(bn, self).c(d!())?;
-        let mut backend = self.clone();
-        backend.rollback_height = Some(rollback_height);
-        let stack = MemoryStackState::new(metadata, &backend);
+        self.rollback_height = Some(rollback_height);
+        let stack = MemoryStackState::new(metadata, self);
         let precompiles = PRECOMPILE_SET.clone();
         let mut executor = StackExecutor::new_with_precompiles(stack, &cfg, &precompiles);
 
@@ -191,18 +128,14 @@ impl EthVmBackend {
         Ok(resp)
     }
 
-    pub fn gen_getter(&self, height: Option<u32>) -> Result<Getter<Connection>> {
+    pub fn gen_getter(&self) -> Result<Getter<Connection>> {
         let con = self.cli.get_connection().c(d!())?;
-        if let Some(h) = height {
-            Ok(Getter::new_with_height(con, PREFIX.to_string(), h))
-        } else {
-            Getter::new(con, PREFIX.to_string()).c(d!())
-        }
+        Ok(Getter::new(con, PREFIX.to_string()))
     }
 
     pub fn get_block_by_number(&self, height: u32) -> Result<Block> {
         let mut con = self.cli.get_connection().c(d!())?;
-        let block_key = keys::block_key(PREFIX, height);
+        let block_key = keys::block_hash_key(PREFIX, U256::from(height));
         let val: Option<String> = con.get(block_key).c(d!())?;
         if let Some(val) = val {
             let block = serde_json::from_str::<Block>(&val).c(d!())?;
@@ -234,9 +167,9 @@ impl EthVmBackend {
             if let Some(rh) = self.rollback_height {
                 rh
             } else {
-                self.gen_getter(None)
+                self.gen_getter()
                     .map_err(|e| error!("{:?}", e))
-                    .map(|g| g.height)
+                    .map(|mut g| g.latest_height().unwrap_or_default())
                     .unwrap_or_default()
             }
         }
@@ -306,9 +239,9 @@ impl Backend for EthVmBackend {
 
     fn exists(&self, address: H160) -> bool {
         let height = self.select_height(None);
-        if let Ok(mut getter) = self.gen_getter(Some(height)) {
+        if let Ok(mut getter) = self.gen_getter() {
             getter
-                .get_account_basic(address)
+                .get_account_basic(height, address)
                 .map_err(|e| error!("{:?}", e))
                 .map(|ab| {
                     if ab.nonce == U256::zero() || ab.balance == U256::zero() {
@@ -325,9 +258,9 @@ impl Backend for EthVmBackend {
 
     fn basic(&self, address: H160) -> Basic {
         let height = self.select_height(None);
-        if let Ok(mut getter) = self.gen_getter(Some(height)) {
+        if let Ok(mut getter) = self.gen_getter() {
             getter
-                .get_account_basic(address)
+                .get_account_basic(height, address)
                 .map_err(|e| error!("{:?}", e))
                 .map(|ab| Basic {
                     balance: ab.balance,
@@ -341,9 +274,9 @@ impl Backend for EthVmBackend {
 
     fn code(&self, address: H160) -> Vec<u8> {
         let height = self.select_height(None);
-        if let Ok(mut getter) = self.gen_getter(Some(height)) {
+        if let Ok(mut getter) = self.gen_getter() {
             getter
-                .get_account_basic(address)
+                .get_account_basic(height, address)
                 .map_err(|e| error!("{:?}", e))
                 .map(|ab| ab.code)
                 .unwrap_or_default()
@@ -354,9 +287,9 @@ impl Backend for EthVmBackend {
 
     fn storage(&self, address: H160, index: H256) -> H256 {
         let height = self.select_height(None);
-        if let Ok(mut getter) = self.gen_getter(Some(height)) {
+        if let Ok(mut getter) = self.gen_getter() {
             getter
-                .get_state(address, index)
+                .get_state(height, address, index)
                 .map_err(|e| error!("{:?}", e))
                 .unwrap_or_default()
         } else {
