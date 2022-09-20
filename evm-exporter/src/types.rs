@@ -1,7 +1,9 @@
-use ethereum::{BlockAny, Log, ReceiptAny};
-use ethereum_types::Bloom;
-use primitive_types::{H160, H256, U256};
-use serde::{Deserialize, Serialize};
+use {
+    ethereum::{BlockAny, Log, ReceiptAny},
+    ethereum_types::Bloom,
+    primitive_types::{H160, H256, U256},
+    serde::{Deserialize, Serialize},
+};
 
 pub const PREFIX: &str = "evm";
 
@@ -17,7 +19,14 @@ pub type Block = BlockAny;
 pub type Receipt = ReceiptAny;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Transaction {
+pub struct State {
+    pub height: u32,
+    pub address: H160,
+    pub index: H256,
+    pub value: H256,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TransactionStatus {
     pub transaction_hash: H256,
     pub transaction_index: u32,
     pub from: H160,
@@ -25,12 +34,4 @@ pub struct Transaction {
     pub contract_address: Option<H160>,
     pub logs: Vec<Log>,
     pub logs_bloom: Bloom,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct State {
-    pub height: u32,
-    pub address: H160,
-    pub index: H256,
-    pub value: H256,
 }
