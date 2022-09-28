@@ -835,56 +835,123 @@ impl EthApi for EthService {
                 return Box::pin(future::err(internal_err(format!("{:?}", e))));
             }
         };
-        let gas_limit = if let Some(gas) = request.gas {
-            gas.as_u64()
+        let mut highest = if let Some(gas) = request.gas {
+            gas
         } else if let Some(b) = block {
-            b.header.gas_limit.as_u64()
+            b.header.gas_limit
         } else {
-            U256::from(u32::max_value()).as_u64()
+            U256::from(u32::max_value())
         };
 
-        let data = request.data.map(|d| d.0).unwrap_or_default();
-        let config = evm::Config::istanbul();
+        // recap gas limit according to account balance
+        if let Some(from) = request.from {
+            let gas_price = request.gas_price.unwrap_or_default();
+            if gas_price > U256::zero() {
+                let balance = match getter.get_balance(height, from) {
+                    Ok(balance) => balance,
+                    Err(e) => {
+                        return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                    }
+                };
+                let mut available = balance;
+                if let Some(value) = request.value {
+                    if value > available {
+                        return Box::pin(future::err(internal_err(
+                            "insufficient funds for transfer",
+                        )));
+                    }
+                    available -= value;
+                }
+                let allowance = available / gas_price;
+                if highest < allowance {
+                    log::warn!(
+                        "Gas estimation capped by limited funds original {} balance {} sent {} feecap {} fundable {}",
+                        highest,
+                        balance,
+                        request.value.unwrap_or_default(),
+                        gas_price,
+                        allowance
+                    );
+                    highest = allowance;
+                }
+            }
+        }
+        let execute_call_or_create =
+            move |request: CallRequest, gas_limit| -> (Vec<u8>, ExitReason, U256) {
+                let data = request.data.map(|d| d.0).unwrap_or_default();
+                let config = evm::Config::istanbul();
 
-        let metadata = StackSubstateMetadata::new(gas_limit, &config);
-        let precompile_set = Web3EvmPrecompiles::default();
-        let mut executor = StackExecutor::new_with_precompiles(
-            Web3EvmStackstate::new(
-                U256::from(self.gas_price),
-                self.chain_id,
-                height,
-                request.from.unwrap_or_default(),
-                self.client.clone(),
-                self.tm_client.clone(),
-                metadata,
-            ),
-            &config,
-            &precompile_set,
-        );
-        let access_list = Vec::new();
+                let metadata = StackSubstateMetadata::new(gas_limit, &config);
+                let precompile_set = Web3EvmPrecompiles::default();
+                let mut executor = StackExecutor::new_with_precompiles(
+                    Web3EvmStackstate::new(
+                        U256::from(self.gas_price),
+                        self.chain_id,
+                        height,
+                        request.from.unwrap_or_default(),
+                        self.client.clone(),
+                        self.tm_client.clone(),
+                        metadata,
+                    ),
+                    &config,
+                    &precompile_set,
+                );
+                let access_list = Vec::new();
 
-        let (exit_reason, used_gas, data) = if let Some(to) = request.to {
-            let (exit_reason, data) = executor.transact_call(
-                request.from.unwrap_or_default(),
-                to,
-                request.value.unwrap_or_default(),
-                data,
-                gas_limit,
-                access_list,
-            );
-            (exit_reason, U256::from(executor.used_gas()), data)
-        } else {
-            let (exit_reason, data) = executor.transact_create(
-                request.from.unwrap_or_default(),
-                request.value.unwrap_or_default(),
-                data,
-                gas_limit,
-                access_list,
-            );
-            (exit_reason, U256::from(executor.used_gas()), data)
-        };
+                if let Some(to) = request.to {
+                    let (exit_reason, data) = executor.transact_call(
+                        request.from.unwrap_or_default(),
+                        to,
+                        request.value.unwrap_or_default(),
+                        data,
+                        gas_limit,
+                        access_list,
+                    );
+                    (data, exit_reason, U256::from(executor.used_gas()))
+                } else {
+                    let (exit_reason, data) = executor.transact_create(
+                        request.from.unwrap_or_default(),
+                        request.value.unwrap_or_default(),
+                        data,
+                        gas_limit,
+                        access_list,
+                    );
+                    (data, exit_reason, U256::from(executor.used_gas()))
+                }
+            };
+
+        let (data, exit_reason, used_gas) =
+            execute_call_or_create(request.clone(), highest.low_u64());
+
         if let Err(e) = Self::error_on_execution_failure(&exit_reason, &data) {
             return Box::pin(future::err(e));
+        }
+        {
+            let mut lowest = U256::from(21_000);
+            let mut mid = std::cmp::min(used_gas * 3, (highest + lowest) / 2);
+            let mut previous_highest = highest;
+
+            while (highest - lowest) > U256::one() {
+                let (data, exit_reason, _) = execute_call_or_create(request.clone(), mid.low_u64());
+                match exit_reason {
+                    ExitReason::Succeed(_) => {
+                        highest = mid;
+                        if (previous_highest - highest) * 10 / previous_highest < U256::one() {
+                            return Box::pin(future::ok(highest));
+                        }
+                        previous_highest = highest;
+                    }
+                    ExitReason::Revert(_) | ExitReason::Error(ExitError::OutOfGas) => {
+                        lowest = mid;
+                    }
+                    other => {
+                        if let Err(e) = Self::error_on_execution_failure(&other, &data) {
+                            return Box::pin(future::err(e));
+                        }
+                    }
+                }
+                mid = (highest + lowest) / 2;
+            }
         }
         Box::pin(future::ok(used_gas))
     }

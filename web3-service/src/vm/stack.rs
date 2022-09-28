@@ -221,7 +221,7 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
     }
 
     fn block_base_fee_per_gas(&self) -> U256 {
-        U256::zero()
+        U256::from(100_0000_0000_u64)
     }
 
     fn chain_id(&self) -> U256 {
