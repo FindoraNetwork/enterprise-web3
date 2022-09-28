@@ -9,16 +9,23 @@ WORKDIR /enterprise-web3
 RUN cargo build --release
 
 RUN mkdir /enterprise-web3-binaries
+
 RUN cp rocksdb-exporter/rocksdb-exporter-config.toml /enterprise-web3-binaries
+RUN cp rocksdb-exporter/run_rocksdb_exporter.sh /enterprise-web3-binaries
 RUN cp target/release/rocksdb-exporter /enterprise-web3-binaries
+
 RUN cp web3-service/rocksdb-exporter-config.toml /enterprise-web3-binaries
 RUN cp target/release/web3-service /enterprise-web3-binaries
+
 RUN strip --strip-all /enterprise-web3-binaries/rocksdb-exporter
 RUN strip --strip-all /enterprise-web3-binaries/web3-service
 
+
 FROM docker.io/busybox:latest
+
+COPY --from=builder /enterprise-web3-binaries/rocksdb-exporter /rocksdb-exporter
+COPY --from=builder /enterprise-web3-binaries/run_rocksdb_exporter.sh /run_rocksdb_exporter.sh
+COPY --from=builder /enterprise-web3-binaries/rocksdb-exporter-config.toml /rocksdb-exporter-config.toml
 
 COPY --from=builder /enterprise-web3-binaries/web3-service /web3-service
 COPY --from=builder /enterprise-web3-binaries/web3-service-config.toml /web3-service-config.toml
-COPY --from=builder /enterprise-web3-binaries/rocksdb-exporter /rocksdb-exporter
-COPY --from=builder /enterprise-web3-binaries/rocksdb-exporter-config.toml /rocksdb-exporter-config.toml
