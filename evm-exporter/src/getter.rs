@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use {
     crate::{keys, AccountBasic, Block, Error, Receipt, Result, TransactionStatus},
     primitive_types::{H160, H256, U256},
@@ -20,9 +19,7 @@ impl<C: ConnectionLike> Getter<C> {
         let height_key = keys::latest_height_key(&self.prefix);
         let height: Option<String> = self.conn.get(height_key)?;
         match height {
-            Some(str) => Ok(
-                str.parse::<u32>().map_err(|e|Error::ParseIntError(e))?
-            ),
+            Some(str) => Ok(str.parse::<u32>().map_err(|e| Error::ParseIntError(e))?),
             _ => Ok(0),
         }
     }

@@ -1,0 +1,27 @@
+[package]
+name = "rocksdb-exporter"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+primitive-types = "0.11.1"
+ethereum = { version = "0.12.0", default-features = false, features = ["with-serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+rocksdb = { version = "0.17.0", default-features = false }
+redis = { version = "0.21", default-features = false, features = ["tls"]}
+evm-exporter = { path = "../evm-exporter" }
+hex = "0.4.3"
+bech32 = "0.7.2"
+paste = "1.0"
+fmerk = "0.1"
+ruc = "2.0"
+toml = "0.5.8"
+
+
+[features]
+default = []
+cluster_redis = ["redis/cluster"]

@@ -1,0 +1,4 @@
+state_db_path = "/tmp/state.db/"
+history_db_path = "/tmp/history.db/"
+redis_url = ["redis://127.0.0.1:6379/0"]
+clear = true
