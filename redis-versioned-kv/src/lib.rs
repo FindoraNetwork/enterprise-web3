@@ -43,7 +43,6 @@ pub trait VersionedKVCommand: ConnectionLike + Sized {
 
         Ok(())
     }
-
 }
 
 impl<T: ConnectionLike + Sized> VersionedKVCommand for T {}
