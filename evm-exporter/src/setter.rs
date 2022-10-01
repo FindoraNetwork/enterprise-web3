@@ -3,8 +3,10 @@ use {
         error::{Error, Result},
         keys,
         types::{Block, TransactionStatus},
+        utils::recover_signer,
         Receipt,
     },
+    ethereum::LegacyTransaction,
     primitive_types::{H160, H256, U256},
     redis::{Commands, ConnectionLike},
     redis_versioned_kv::VersionedKVCommand,
@@ -118,6 +120,95 @@ impl<C: ConnectionLike> Setter<C> {
                 )
                 .map_err(|e| Error::RedisError(e))?;
         }
+        Ok(())
+    }
+
+    pub fn set_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()> {
+        let sign_address = recover_signer(&transaction)?;
+
+        let height_key = keys::latest_height_key(&self.prefix);
+        let height: Option<String> = self.conn.get(height_key)?;
+        let height = match height {
+            Some(str) => (str.parse::<u32>().map_err(|e| Error::ParseIntError(e))?),
+            _ => (0),
+        };
+        let balance_key = keys::balance_key(&self.prefix, sign_address);
+        let balance: Option<String> = self.conn.vkv_get(balance_key, height)?;
+        let balance = if let Some(s) = balance {
+            serde_json::from_str(s.as_str())?
+        } else {
+            U256::zero()
+        };
+
+        let pending_balance_key = keys::pending_balance_key(&self.prefix, sign_address);
+        let total_payment = transaction
+            .value
+            .saturating_add(transaction.gas_price.saturating_mul(transaction.gas_limit));
+        self.conn
+            .set(
+                pending_balance_key,
+                serde_json::to_string(&balance.saturating_sub(total_payment))?,
+            )
+            .map_err(|e| Error::RedisError(e))?;
+
+        let pending_nonce_key = keys::pending_nonce_key(&self.prefix, sign_address);
+        self.conn
+            .set(
+                pending_nonce_key,
+                serde_json::to_string(&transaction.nonce)?,
+            )
+            .map_err(|e| Error::RedisError(e))?;
+
+        Ok(())
+    }
+
+    pub fn set_pending_code(&mut self, address: H160, code: Vec<u8>) -> Result<()> {
+        let pending_code_key = keys::pending_code_key(&self.prefix, address);
+        self.conn
+            .set(pending_code_key, serde_json::to_string(&code)?)
+            .map_err(|e| Error::RedisError(e))?;
+        Ok(())
+    }
+
+    pub fn set_pending_state(&mut self, address: H160, index: H256, value: H256) -> Result<()> {
+        let pending_state_key = keys::pending_state_key(&self.prefix, address, index);
+        self.conn
+            .set(pending_state_key, serde_json::to_string(&value)?)
+            .map_err(|e| Error::RedisError(e))?;
+
+        Ok(())
+    }
+
+    pub fn remove_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()> {
+        let sign_address = recover_signer(&transaction)?;
+        let pending_balance_key = keys::pending_balance_key(&self.prefix, sign_address);
+
+        self.conn
+            .del(pending_balance_key)
+            .map_err(|e| Error::RedisError(e))?;
+
+        let pending_nonce_key = keys::pending_nonce_key(&self.prefix, sign_address);
+        self.conn
+            .del(pending_nonce_key)
+            .map_err(|e| Error::RedisError(e))?;
+
+        Ok(())
+    }
+
+    pub fn remove_pending_code(&mut self, address: H160) -> Result<()> {
+        let pending_code_key = keys::pending_code_key(&self.prefix, address);
+        self.conn
+            .del(pending_code_key)
+            .map_err(|e| Error::RedisError(e))?;
+        Ok(())
+    }
+
+    pub fn remove_pending_state(&mut self, address: H160, index: H256) -> Result<()> {
+        let pending_state_key = keys::pending_state_key(&self.prefix, address, index);
+        self.conn
+            .del(pending_state_key)
+            .map_err(|e| Error::RedisError(e))?;
+
         Ok(())
     }
 }

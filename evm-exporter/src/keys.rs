@@ -56,3 +56,24 @@ pub fn status_key(prefix: &str, block_hash: H256) -> String {
 pub fn transaction_index_key(prefix: &str, tx_hash: H256) -> String {
     format!("{}:tx_index_key:tx_hash.{:?}", prefix, hex::encode(tx_hash))
 }
+
+pub fn pending_balance_key(prefix: &str, addr: H160) -> String {
+    format!("{}:pending_balance:addr.{}", prefix, hex::encode(addr))
+}
+
+pub fn pending_nonce_key(prefix: &str, addr: H160) -> String {
+    format!("{}:pending_nonce:addr.{}", prefix, hex::encode(addr))
+}
+
+pub fn pending_code_key(prefix: &str, addr: H160) -> String {
+    format!("{}:pending_code:addr.{}", prefix, hex::encode(addr))
+}
+
+pub fn pending_state_key(prefix: &str, addr: H160, index: H256) -> String {
+    format!(
+        "{}:pending_state:addr.{}:index:u256.{}",
+        prefix,
+        hex::encode(addr),
+        hex::encode(index)
+    )
+}

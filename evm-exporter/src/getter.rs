@@ -155,4 +155,48 @@ impl<C: ConnectionLike> Getter<C> {
             _ => Ok(None),
         }
     }
+
+    pub fn get_pending_balance(&mut self, address: H160) -> Result<Option<U256>> {
+        let balance_key = keys::pending_balance_key(&self.prefix, address);
+        let balance: Option<String> = self.conn.get(balance_key)?;
+        let balance = if let Some(s) = balance {
+            Some(serde_json::from_str(s.as_str())?)
+        } else {
+            None
+        };
+        Ok(balance)
+    }
+
+    pub fn get_pending_nonce(&mut self, address: H160) -> Result<Option<U256>> {
+        let nonce_key = keys::pending_nonce_key(&self.prefix, address);
+        let nonce: Option<String> = self.conn.get(nonce_key)?;
+        let nonce = if let Some(s) = nonce {
+            Some(serde_json::from_str(s.as_str())?)
+        } else {
+            None
+        };
+        Ok(nonce)
+    }
+
+    pub fn get_pending_byte_code(&mut self, address: H160) -> Result<Option<Vec<u8>>> {
+        let code_key = keys::pending_code_key(&self.prefix, address);
+        let code: Option<String> = self.conn.get(code_key)?;
+        let code = if let Some(s) = code {
+            Some(hex::decode(s)?)
+        } else {
+            None
+        };
+        Ok(code)
+    }
+
+    pub fn get_pending_state(&mut self, address: H160, index: H256) -> Result<Option<H256>> {
+        let state_key = keys::pending_state_key(&self.prefix, address, index);
+        let value: Option<String> = self.conn.get(state_key)?;
+        let val = if let Some(s) = value {
+            Some(serde_json::from_str(s.as_str())?)
+        } else {
+            None
+        };
+        Ok(val)
+    }
 }
