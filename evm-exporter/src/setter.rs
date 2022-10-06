@@ -21,7 +21,7 @@ impl<C: ConnectionLike> Setter<C> {
     }
 
     pub fn clear(&mut self) -> Result<()> {
-        redis::cmd("FLUSHALL")
+        redis::cmd("FLUSHDB")
             .arg("SYNC")
             .query(&mut self.conn)
             .map_err(|e| Error::RedisError(e))?;
