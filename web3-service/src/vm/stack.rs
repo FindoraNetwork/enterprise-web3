@@ -38,6 +38,7 @@ pub struct Web3EvmStackstate<'config> {
     gas_price: U256,
     chain_id: u32,
     height: u32,
+    is_pending: bool,
     origin: H160,
     client: Arc<redis::Client>,
     tm_client: Arc<HttpClient>,
@@ -55,6 +56,7 @@ impl<'config> Web3EvmStackstate<'config> {
         gas_price: U256,
         chain_id: u32,
         height: u32,
+        is_pending: bool,
         origin: H160,
         client: Arc<redis::cluster::ClusterClient>,
         tm_client: Arc<HttpClient>,
@@ -64,6 +66,7 @@ impl<'config> Web3EvmStackstate<'config> {
             gas_price,
             chain_id,
             height,
+            is_pending,
             origin,
             metadata,
             client,
@@ -81,6 +84,7 @@ impl<'config> Web3EvmStackstate<'config> {
         gas_price: U256,
         chain_id: u32,
         height: u32,
+        is_pending: bool,
         origin: H160,
         client: Arc<redis::Client>,
         tm_client: Arc<HttpClient>,
@@ -90,6 +94,7 @@ impl<'config> Web3EvmStackstate<'config> {
             gas_price,
             chain_id,
             height,
+            is_pending,
             origin,
             metadata,
             client,
@@ -247,8 +252,25 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
         let func = || -> ruc::Result<Basic> {
             let conn = self.client.get_connection().c(d!())?;
             let mut getter = Getter::new(conn, PREFIX.to_string());
-            let balance = getter.get_balance(self.height, address).c(d!())?;
-            let nonce = getter.get_nonce(self.height, address).c(d!())?;
+
+            let balance = if self.is_pending {
+                getter
+                    .get_pending_balance(address)
+                    .c(d!())?
+                    .unwrap_or(getter.get_balance(self.height, address).c(d!())?)
+            } else {
+                getter.get_balance(self.height, address).c(d!())?
+            };
+
+            let nonce = if self.is_pending {
+                getter
+                    .get_pending_nonce(address)
+                    .c(d!())?
+                    .unwrap_or(getter.get_nonce(self.height, address).c(d!())?)
+            } else {
+                getter.get_nonce(self.height, address).c(d!())?
+            };
+
             Ok(Basic { balance, nonce })
         };
         func().unwrap_or_default()
@@ -261,7 +283,15 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
         let func = || -> ruc::Result<Vec<u8>> {
             let conn = self.client.get_connection().c(d!())?;
             let mut getter = Getter::new(conn, PREFIX.to_string());
-            getter.get_byte_code(self.height, address).c(d!())
+
+            Ok(if self.is_pending {
+                getter
+                    .get_pending_byte_code(address)
+                    .c(d!())?
+                    .unwrap_or(getter.get_byte_code(self.height, address).c(d!())?)
+            } else {
+                getter.get_byte_code(self.height, address).c(d!())?
+            })
         };
         func().unwrap_or_default()
     }
@@ -274,7 +304,15 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
         let func = || -> ruc::Result<H256> {
             let conn = self.client.get_connection().c(d!())?;
             let mut getter = Getter::new(conn, PREFIX.to_string());
-            getter.get_state(self.height, address, index).c(d!())
+
+            Ok(if self.is_pending {
+                getter
+                    .get_pending_state(address, index)
+                    .c(d!())?
+                    .unwrap_or(getter.get_state(self.height, address, index).c(d!())?)
+            } else {
+                getter.get_state(self.height, address, index).c(d!())?
+            })
         };
         func().unwrap_or_default()
     }
@@ -298,6 +336,7 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
             self.gas_price,
             self.chain_id,
             self.height,
+            self.is_pending,
             self.origin,
             self.client.clone(),
             self.tm_client.clone(),

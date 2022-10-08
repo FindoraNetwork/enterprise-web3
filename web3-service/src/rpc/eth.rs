@@ -8,15 +8,13 @@ use {
             stack::Web3EvmStackstate,
         },
     },
-    ethereum::{
-        LegacyTransaction, LegacyTransactionMessage, ReceiptAny, TransactionAny, TransactionV2,
-    },
+    ethereum::{LegacyTransaction, ReceiptAny, TransactionAny, TransactionV2},
     ethereum_types::{BigEndianHash, H160, H256, H512, H64, U256, U64},
     evm::{
         executor::stack::{StackExecutor, StackSubstateMetadata},
         {ExitError, ExitReason},
     },
-    evm_exporter::{Getter, TransactionStatus, PREFIX},
+    evm_exporter::{utils::public_key, Getter, TransactionStatus, PREFIX},
     jsonrpc_core::{futures::future, BoxFuture, Error, ErrorCode, Result, Value},
     lazy_static::lazy_static,
     ruc::{pnk, RucResult},
@@ -80,30 +78,7 @@ impl EthService {
             tm_client: Arc::new(pnk!(HttpClient::new(tm_url))),
         }
     }
-    fn public_key(transaction: &TransactionAny) -> Result<[u8; 64]> {
-        if let TransactionV2::Legacy(tx) = transaction {
-            let mut sig = [0u8; 65];
-            let mut msg = [0u8; 32];
-            sig[0..32].copy_from_slice(&tx.signature.r()[..]);
-            sig[32..64].copy_from_slice(&tx.signature.s()[..]);
-            sig[64] = tx.signature.standard_v();
-            msg.copy_from_slice(&LegacyTransactionMessage::from(tx.clone()).hash()[..]);
-            let rs = libsecp256k1::Signature::parse_standard_slice(&sig[0..64])
-                .map_err(|e| internal_err(e))?;
-            let v =
-                libsecp256k1::RecoveryId::parse(
-                    if sig[64] > 26 { sig[64] - 27 } else { sig[64] } as u8
-                )
-                .map_err(|e| internal_err(e))?;
-            let pubkey = libsecp256k1::recover(&libsecp256k1::Message::parse(&msg), &rs, &v)
-                .map_err(|e| internal_err(e))?;
-            let mut res = [0u8; 64];
-            res.copy_from_slice(&pubkey.serialize()[1..65]);
-            Ok(res)
-        } else {
-            Err(internal_err("tx type no support"))
-        }
-    }
+
     fn transaction_build(
         block: &evm_exporter::Block,
         transaction: &TransactionAny,
@@ -124,7 +99,7 @@ impl EthService {
                 input: Bytes(tx.input.clone()),
                 creates: status.contract_address,
                 raw: Bytes(rlp::encode(tx).to_vec()),
-                public_key: Self::public_key(&transaction).ok().map(H512::from),
+                public_key: public_key(&tx).ok().map(H512::from),
                 chain_id: tx.signature.chain_id().map(U64::from),
                 standard_v: U256::from(tx.signature.standard_v()),
                 v: U256::from(tx.signature.v()),
@@ -335,7 +310,21 @@ impl EthApi for EthService {
             }
         };
         let mut getter = Getter::new(conn, PREFIX.to_string());
-        let height = match block_number_to_height(number, &mut getter) {
+
+        if let Some(BlockNumber::Pending) = number {
+            match getter.get_pending_balance(address) {
+                Ok(balance) => {
+                    if let Some(val) = balance {
+                        return Box::pin(future::ok(val));
+                    }
+                }
+                Err(e) => {
+                    return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                }
+            }
+        };
+
+        let height = match block_number_to_height(number.clone(), &mut getter) {
             Ok(h) => h,
             Err(e) => {
                 return Box::pin(future::err(internal_err(e.to_string())));
@@ -367,6 +356,12 @@ impl EthApi for EthService {
         };
         let mut getter = Getter::new(conn, PREFIX.to_string());
 
+        let is_pending = if let Some(BlockNumber::Pending) = number {
+            true
+        } else {
+            false
+        };
+
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
@@ -385,6 +380,7 @@ impl EthApi for EthService {
                 U256::from(self.gas_price),
                 self.chain_id,
                 height,
+                is_pending,
                 request.from.unwrap_or_default(),
                 self.client.clone(),
                 self.tm_client.clone(),
@@ -506,7 +502,18 @@ impl EthApi for EthService {
             }
         };
         let mut getter = Getter::new(conn, PREFIX.to_string());
-
+        if let Some(BlockNumber::Pending) = number {
+            match getter.get_pending_state(address, H256::from_uint(&index)) {
+                Ok(value) => {
+                    if let Some(val) = value {
+                        return Box::pin(future::ok(val));
+                    }
+                }
+                Err(e) => {
+                    return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                }
+            }
+        };
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
@@ -637,6 +644,18 @@ impl EthApi for EthService {
             }
         };
         let mut getter = Getter::new(conn, PREFIX.to_string());
+        if let Some(BlockNumber::Pending) = number {
+            match getter.get_pending_nonce(address) {
+                Ok(nonce) => {
+                    if let Some(val) = nonce {
+                        return Box::pin(future::ok(val));
+                    }
+                }
+                Err(e) => {
+                    return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                }
+            }
+        };
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
@@ -743,7 +762,18 @@ impl EthApi for EthService {
             }
         };
         let mut getter = Getter::new(conn, PREFIX.to_string());
-
+        if let Some(BlockNumber::Pending) = number {
+            match getter.get_pending_byte_code(address) {
+                Ok(byte_code) => {
+                    if let Some(code) = byte_code {
+                        return Box::pin(future::ok(code.into()));
+                    }
+                }
+                Err(e) => {
+                    return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                }
+            }
+        };
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
@@ -811,7 +841,11 @@ impl EthApi for EthService {
             }
         };
         let mut getter = Getter::new(conn, PREFIX.to_string());
-
+        let is_pending = if let Some(BlockNumber::Pending) = number {
+            true
+        } else {
+            false
+        };
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
@@ -876,6 +910,7 @@ impl EthApi for EthService {
                 }
             }
         }
+
         let execute_call_or_create =
             move |request: CallRequest, gas_limit| -> (Vec<u8>, ExitReason, U256) {
                 let data = request.data.map(|d| d.0).unwrap_or_default();
@@ -888,6 +923,7 @@ impl EthApi for EthService {
                         U256::from(self.gas_price),
                         self.chain_id,
                         height,
+                        is_pending,
                         request.from.unwrap_or_default(),
                         self.client.clone(),
                         self.tm_client.clone(),
