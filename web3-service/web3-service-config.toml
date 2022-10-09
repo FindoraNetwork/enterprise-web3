@@ -1,6 +1,6 @@
 http_port = 8545
 ws_port = 8546
 redis_url = ["redis://127.0.0.1:6379"]
-tendermint_url = https://prod-mainnet.prod.findora.org:26657"
+tendermint_url = "https://prod-mainnet.prod.findora.org:26657"
 chain_id = 2152
 gas_price = 10000000000
