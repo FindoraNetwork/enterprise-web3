@@ -30,14 +30,14 @@ const SPLIT_BGN: &str = "_";
 const SPLIT_END: &str = "~";
 
 pub fn get_current_height(history_db: &Arc<RocksDB>) -> Result<U256> {
-    let storage = EthereumCurrentBlockNumber::new(&history_db);
+    let storage = EthereumCurrentBlockNumber::new(history_db);
 
     match storage.get(CF_NAME_STATE)? {
         Some(v) => storage.parse_data(false, &v),
         None => Ok(U256::zero()),
     }
 }
-
+#[allow(clippy::type_complexity)]
 pub fn get_block_info(
     height: U256,
     history_db: &Arc<RocksDB>,
@@ -94,7 +94,7 @@ pub fn get_block_info(
 
     Ok(Some((block, receipts, statuses)))
 }
-
+#[allow(clippy::type_complexity)]
 pub fn get_account_info(
     state_db: &Arc<RocksDB>,
     height: u64,

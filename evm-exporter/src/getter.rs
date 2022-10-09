@@ -1,5 +1,5 @@
 use {
-    crate::{keys, AccountBasic, Block, Error, Receipt, Result, TransactionStatus},
+    crate::{keys, AccountBasic, Block, Receipt, Result, TransactionStatus},
     primitive_types::{H160, H256, U256},
     redis::{Commands, ConnectionLike},
     redis_versioned_kv::VersionedKVCommand,
@@ -19,7 +19,7 @@ impl<'a, C: ConnectionLike> Getter<'a, C> {
         let height_key = keys::latest_height_key(&self.prefix);
         let height: Option<String> = self.conn.get(height_key)?;
         match height {
-            Some(str) => Ok(str.parse::<u32>().map_err(|e| Error::ParseIntError(e))?),
+            Some(str) => Ok(str.parse::<u32>()?),
             _ => Ok(0),
         }
     }
@@ -111,10 +111,7 @@ impl<'a, C: ConnectionLike> Getter<'a, C> {
         block_hash: H256,
     ) -> Result<Option<Vec<Receipt>>> {
         let receipt_key = keys::receipt_key(&self.prefix, block_hash);
-        let value: Option<String> = self
-            .conn
-            .get(receipt_key)
-            .map_err(|e| Error::RedisError(e))?;
+        let value: Option<String> = self.conn.get(receipt_key)?;
 
         match value {
             Some(receipts) => Ok(serde_json::from_str(receipts.as_str())?),
@@ -128,10 +125,7 @@ impl<'a, C: ConnectionLike> Getter<'a, C> {
     ) -> Result<Option<Vec<TransactionStatus>>> {
         let status_key = keys::status_key(&self.prefix, block_hash);
 
-        let value: Option<String> = self
-            .conn
-            .get(status_key)
-            .map_err(|e| Error::RedisError(e))?;
+        let value: Option<String> = self.conn.get(status_key)?;
 
         match value {
             Some(statuses) => Ok(serde_json::from_str(statuses.as_str())?),
@@ -145,10 +139,7 @@ impl<'a, C: ConnectionLike> Getter<'a, C> {
     ) -> Result<Option<(H256, u32)>> {
         let transaction_index_key = keys::transaction_index_key(&self.prefix, tx_hash);
 
-        let value: Option<String> = self
-            .conn
-            .get(transaction_index_key)
-            .map_err(|e| Error::RedisError(e))?;
+        let value: Option<String> = self.conn.get(transaction_index_key)?;
 
         match value {
             Some(hash_index) => Ok(serde_json::from_str(hash_index.as_str())?),

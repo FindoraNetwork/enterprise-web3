@@ -54,7 +54,7 @@ impl AccountAccountStore {
         kv_pair: &(Box<[u8]>, Box<[u8]>),
     ) -> Result<Option<(H160, (U256, U256))>> {
         let (key, value) = if is_decode_kv {
-            decode_kv(&kv_pair)
+            decode_kv(kv_pair)
         } else {
             (kv_pair.0.to_vec(), kv_pair.1.to_vec())
         };
@@ -87,7 +87,7 @@ impl EthereumCurrentBlockNumber {
         } else {
             kv_pair.1.to_vec()
         };
-        Ok(serde_json::from_slice::<U256>(&val).c(d!())?)
+        serde_json::from_slice::<U256>(&val).c(d!())
     }
 }
 
@@ -98,7 +98,7 @@ impl EthereumBlockHash {
         kv_pair: &(Box<[u8]>, Box<[u8]>),
     ) -> Result<(U256, H256)> {
         let (key, value) = if is_decode_kv {
-            decode_kv(&kv_pair)
+            decode_kv(kv_pair)
         } else {
             (kv_pair.0.to_vec(), kv_pair.1.to_vec())
         };
@@ -124,7 +124,7 @@ impl EthereumCurrentBlock {
         kv_pair: &(Box<[u8]>, Box<[u8]>),
     ) -> Result<(H256, Block)> {
         let (key, value) = if is_decode_kv {
-            decode_kv(&kv_pair)
+            decode_kv(kv_pair)
         } else {
             (kv_pair.0.to_vec(), kv_pair.1.to_vec())
         };
@@ -149,7 +149,7 @@ impl EthereumCurrentReceipts {
         kv_pair: &(Box<[u8]>, Box<[u8]>),
     ) -> Result<(H256, Vec<Receipt>)> {
         let (key, value) = if is_decode_kv {
-            decode_kv(&kv_pair)
+            decode_kv(kv_pair)
         } else {
             (kv_pair.0.to_vec(), kv_pair.1.to_vec())
         };
@@ -174,7 +174,7 @@ impl EthereumCurrentTransactionStatuses {
         kv_pair: &(Box<[u8]>, Box<[u8]>),
     ) -> Result<(H256, Vec<TransactionStatus>)> {
         let (key, value) = if is_decode_kv {
-            decode_kv(&kv_pair)
+            decode_kv(kv_pair)
         } else {
             (kv_pair.0.to_vec(), kv_pair.1.to_vec())
         };
@@ -199,7 +199,7 @@ impl EVMAccountCodes {
         kv_pair: &(Box<[u8]>, Box<[u8]>),
     ) -> Result<(H160, Vec<u8>)> {
         let (key, value) = if is_decode_kv {
-            decode_kv(&kv_pair)
+            decode_kv(kv_pair)
         } else {
             (kv_pair.0.to_vec(), kv_pair.1.to_vec())
         };
@@ -221,7 +221,7 @@ impl EVMAccountStorages {
         kv_pair: &(Box<[u8]>, Box<[u8]>),
     ) -> Result<((H160, H256), H256)> {
         let (key, value) = if is_decode_kv {
-            decode_kv(&kv_pair)
+            decode_kv(kv_pair)
         } else {
             (kv_pair.0.to_vec(), kv_pair.1.to_vec())
         };

@@ -104,7 +104,7 @@ impl EthService {
                 input: Bytes(tx.input.clone()),
                 creates: status.contract_address,
                 raw: Bytes(rlp::encode(tx).to_vec()),
-                public_key: public_key(&tx).ok().map(H512::from),
+                public_key: public_key(tx).ok().map(H512::from),
                 chain_id: tx.signature.chain_id().map(U64::from),
                 standard_v: U256::from(tx.signature.standard_v()),
                 v: U256::from(tx.signature.v()),
@@ -180,65 +180,6 @@ impl EthService {
             },
             extra_info: BTreeMap::new(),
         }
-    }
-    pub fn filter_block_logs<'a>(
-        ret: &'a mut Vec<Log>,
-        filter: &'a Filter,
-        block: evm_exporter::Block,
-        transaction_statuses: Vec<TransactionStatus>,
-    ) -> &'a Vec<Log> {
-        let params = FilteredParams::new(Some(filter.clone()));
-        let mut block_log_index: u32 = 0;
-        let block_hash =
-            H256::from_slice(Keccak256::digest(&rlp::encode(&block.header)).as_slice());
-        for status in transaction_statuses.iter() {
-            let logs = status.logs.clone();
-            let transaction_hash = status.transaction_hash;
-            for (transaction_log_index, ethereum_log) in logs.into_iter().enumerate() {
-                let mut log = Log {
-                    address: ethereum_log.address,
-                    topics: ethereum_log.topics.clone(),
-                    data: Bytes(ethereum_log.data.clone()),
-                    block_hash: None,
-                    block_number: None,
-                    transaction_hash: None,
-                    transaction_index: None,
-                    log_index: None,
-                    transaction_log_index: None,
-                    removed: false,
-                };
-                let mut add: bool = true;
-                match (filter.address.clone(), filter.topics.clone()) {
-                    (Some(_), Some(_)) => {
-                        if !params.filter_address(&log) || !params.filter_topics(&log) {
-                            add = false;
-                        }
-                    }
-                    (Some(_), None) => {
-                        if !params.filter_address(&log) {
-                            add = false;
-                        }
-                    }
-                    (None, Some(_)) => {
-                        if !params.filter_topics(&log) {
-                            add = false;
-                        }
-                    }
-                    (None, None) => {}
-                }
-                if add {
-                    log.block_hash = Some(block_hash);
-                    log.block_number = Some(block.header.number);
-                    log.transaction_hash = Some(transaction_hash);
-                    log.transaction_index = Some(U256::from(status.transaction_index));
-                    log.log_index = Some(U256::from(block_log_index));
-                    log.transaction_log_index = Some(U256::from(transaction_log_index));
-                    ret.push(log);
-                }
-                block_log_index += 1;
-            }
-        }
-        ret
     }
 
     fn error_on_execution_failure(
@@ -336,7 +277,7 @@ impl EthApi for EthService {
             }
         };
 
-        let height = match block_number_to_height(number.clone(), &mut getter) {
+        let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -348,12 +289,10 @@ impl EthApi for EthService {
 
         match getter.get_balance(height, address) {
             Ok(balance) => Box::pin(future::ok(balance)),
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api balance get_balance:{:?}",
-                    e.to_string()
-                ))));
-            }
+            Err(e) => Box::pin(future::err(internal_err(format!(
+                "eth api balance get_balance:{:?}",
+                e.to_string()
+            )))),
         }
     }
 
@@ -377,11 +316,7 @@ impl EthApi for EthService {
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
 
-        let is_pending = if let Some(BlockNumber::Pending) = number {
-            true
-        } else {
-            false
-        };
+        let is_pending = matches!(number, Some(BlockNumber::Pending));
 
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
@@ -478,7 +413,7 @@ impl EthApi for EthService {
             }
         };
 
-        let block = match getter.get_block_by_hash(hash.clone()) {
+        let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
                     hash_index
@@ -521,12 +456,10 @@ impl EthApi for EthService {
 
         match getter.latest_height() {
             Ok(height) => Box::pin(future::ok(U256::from(height))),
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api block_number latest_height error:{:?}",
-                    e.to_string()
-                ))));
-            }
+            Err(e) => Box::pin(future::err(internal_err(format!(
+                "eth api block_number latest_height error:{:?}",
+                e.to_string()
+            )))),
         }
     }
 
@@ -593,7 +526,7 @@ impl EthApi for EthService {
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
 
-        let block = match getter.get_block_by_hash(hash.clone()) {
+        let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
                     hash_index
@@ -608,7 +541,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash.clone()) {
+        let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash) {
             Ok(value) => {
                 if let Some(statuses) = value {
                     statuses
@@ -672,7 +605,7 @@ impl EthApi for EthService {
             }
         };
 
-        let block = match getter.get_block_by_hash(hash.clone()) {
+        let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
                     hash_index
@@ -687,7 +620,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash.clone()) {
+        let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash) {
             Ok(value) => {
                 if let Some(statuses) = value {
                     statuses
@@ -770,7 +703,7 @@ impl EthApi for EthService {
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
-        let block = match getter.get_block_by_hash(hash.clone()) {
+        let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
                     hash_index
@@ -829,7 +762,7 @@ impl EthApi for EthService {
             }
         };
 
-        let block = match getter.get_block_by_hash(hash.clone()) {
+        let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(block) = value {
                     block
@@ -974,11 +907,8 @@ impl EthApi for EthService {
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
-        let is_pending = if let Some(BlockNumber::Pending) = number {
-            true
-        } else {
-            false
-        };
+        let is_pending = matches!(number, Some(BlockNumber::Pending));
+
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
@@ -991,7 +921,7 @@ impl EthApi for EthService {
         let block = match getter.get_block_hash_by_height(U256::from(height)) {
             Ok(value) => {
                 if let Some(hash) = value {
-                    match getter.get_block_by_hash(hash.clone()) {
+                    match getter.get_block_by_hash(hash) {
                         Ok(value) => value,
                         Err(e) => {
                             return Box::pin(future::err(internal_err(format!(
@@ -1164,7 +1094,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let block = match getter.get_block_by_hash(hash.clone()) {
+        let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
                     hash_index
@@ -1184,7 +1114,7 @@ impl EthApi for EthService {
         } else {
             return Box::pin(future::ok(None));
         };
-        let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash.clone()) {
+        let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash) {
             Ok(value) => {
                 if let Some(statuses) = value {
                     statuses
@@ -1227,7 +1157,7 @@ impl EthApi for EthService {
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
-        let block = match getter.get_block_by_hash(hash.clone()) {
+        let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
                     hash_index
@@ -1247,7 +1177,7 @@ impl EthApi for EthService {
         } else {
             return Box::pin(future::ok(None));
         };
-        let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash.clone()) {
+        let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash) {
             Ok(value) => {
                 if let Some(statuses) = value {
                     statuses
@@ -1316,7 +1246,7 @@ impl EthApi for EthService {
             }
         };
 
-        let block = match getter.get_block_by_hash(hash.clone()) {
+        let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
                     hash_index
@@ -1336,7 +1266,7 @@ impl EthApi for EthService {
         } else {
             return Box::pin(future::ok(None));
         };
-        let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash.clone()) {
+        let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash) {
             Ok(value) => {
                 if let Some(statuses) = value {
                     statuses
@@ -1390,7 +1320,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let block = match getter.get_block_by_hash(hash.clone()) {
+        let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
                     hash_index
@@ -1506,7 +1436,7 @@ impl EthApi for EthService {
                     .collect()
             },
             status_code: Some(status_code),
-            logs_bloom: logs_bloom,
+            logs_bloom,
             state_root: None,
         };
 
@@ -1561,7 +1491,7 @@ impl EthApi for EthService {
             match getter.get_transaction_status_by_block_hash(block_hash) {
                 Ok(value) => {
                     if let Some(statuses) = value {
-                        Self::filter_block_logs(&mut ret, &filter, block, statuses);
+                        filter_block_logs(&mut ret, &filter, block, statuses);
                     }
                 }
                 Err(e) => {
@@ -1624,9 +1554,9 @@ impl EthApi for EthService {
                         if let Some(hash) = value {
                             hash
                         } else {
-                            return Box::pin(future::err(internal_err(format!(
+                            return Box::pin(future::err(internal_err(
                                 "eth api logs get_block_hash_by_height return none",
-                            ))));
+                            )));
                         }
                     }
                     Err(e) => {
@@ -1642,9 +1572,9 @@ impl EthApi for EthService {
                         if let Some(b) = value {
                             b
                         } else {
-                            return Box::pin(future::err(internal_err(format!(
+                            return Box::pin(future::err(internal_err(
                                 "eth api logs get_block_by_hash return none",
-                            ))));
+                            )));
                         }
                     }
                     Err(e) => {
@@ -1665,7 +1595,7 @@ impl EthApi for EthService {
                         Ok(value) => {
                             if let Some(statuses) = value {
                                 let mut logs: Vec<Log> = Vec::new();
-                                Self::filter_block_logs(&mut logs, &filter, block, statuses);
+                                filter_block_logs(&mut logs, &filter, block, statuses);
                                 ret.append(&mut logs);
                             }
                         }
@@ -1711,4 +1641,62 @@ impl EthApi for EthService {
         log::info!(target: "eth api", "submit_hashrate");
         Ok(false)
     }
+}
+pub fn filter_block_logs<'a>(
+    ret: &'a mut Vec<Log>,
+    filter: &'a Filter,
+    block: evm_exporter::Block,
+    transaction_statuses: Vec<TransactionStatus>,
+) -> &'a Vec<Log> {
+    let params = FilteredParams::new(Some(filter.clone()));
+    let mut block_log_index: u32 = 0;
+    let block_hash = H256::from_slice(Keccak256::digest(&rlp::encode(&block.header)).as_slice());
+    for status in transaction_statuses.iter() {
+        let logs = status.logs.clone();
+        let transaction_hash = status.transaction_hash;
+        for (transaction_log_index, ethereum_log) in logs.into_iter().enumerate() {
+            let mut log = Log {
+                address: ethereum_log.address,
+                topics: ethereum_log.topics.clone(),
+                data: Bytes(ethereum_log.data.clone()),
+                block_hash: None,
+                block_number: None,
+                transaction_hash: None,
+                transaction_index: None,
+                log_index: None,
+                transaction_log_index: None,
+                removed: false,
+            };
+            let mut add: bool = true;
+            match (filter.address.clone(), filter.topics.clone()) {
+                (Some(_), Some(_)) => {
+                    if !params.filter_address(&log) || !params.filter_topics(&log) {
+                        add = false;
+                    }
+                }
+                (Some(_), None) => {
+                    if !params.filter_address(&log) {
+                        add = false;
+                    }
+                }
+                (None, Some(_)) => {
+                    if !params.filter_topics(&log) {
+                        add = false;
+                    }
+                }
+                (None, None) => {}
+            }
+            if add {
+                log.block_hash = Some(block_hash);
+                log.block_number = Some(block.header.number);
+                log.transaction_hash = Some(transaction_hash);
+                log.transaction_index = Some(U256::from(status.transaction_index));
+                log.log_index = Some(U256::from(block_log_index));
+                log.transaction_log_index = Some(U256::from(transaction_log_index));
+                ret.push(log);
+            }
+            block_log_index += 1;
+        }
+    }
+    ret
 }

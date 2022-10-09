@@ -1,20 +1,28 @@
 mod config;
+mod notify;
 mod rpc;
 mod utils;
 mod vm;
 
 use {
-    crate::rpc::health::{HealthApi, HealthApiImpl},
+    crate::{
+        notify::SubscriberNotify,
+        rpc::{
+            eth_pubsub::EthPubSubApiImpl,
+            health::{HealthApi, HealthApiImpl},
+        },
+    },
     config::Config,
-    jsonrpc_core::IoHandler,
-    rpc::{eth::EthService, net::NetApiImpl, web3::Web3ApiImpl},
+    jsonrpc_core::MetaIoHandler,
+    jsonrpc_pubsub::PubSubHandler,
+    rpc::{eth::EthService, eth_filter::EthFilterApiImpl, net::NetApiImpl, web3::Web3ApiImpl},
     ruc::*,
     std::{
         net::SocketAddr,
         sync::Arc,
         thread::{self, available_parallelism},
     },
-    web3_rpc_core::{EthApi, NetApi, Web3Api},
+    web3_rpc_core::{EthApi, EthFilterApi, EthPubSubApi, NetApi, Web3Api},
 };
 
 fn main() {
@@ -33,24 +41,29 @@ fn main() {
 
     let pool = Arc::new(pnk!(r2d2::Pool::builder().max_size(50).build(client)));
 
-    let tendermint_rpc = config.tendermint_url;
-
-    let mut io = IoHandler::new();
+    let mut io = MetaIoHandler::default();
     let eth = EthService::new(
         config.chain_id,
         config.gas_price,
         pool.clone(),
-        tendermint_rpc.as_str(),
+        &config.tendermint_url,
     );
 
     let net = NetApiImpl::new();
     let web3 = Web3ApiImpl::new();
     let health = HealthApiImpl::new();
+    let filter = EthFilterApiImpl::new(pool.clone());
+    let subscriber_notify = Arc::new(SubscriberNotify::new(pool.clone(), &config.tendermint_url));
+    pnk!(subscriber_notify.start());
+    let pub_sub = EthPubSubApiImpl::new(pool, subscriber_notify);
 
     io.extend_with(eth.to_delegate());
     io.extend_with(net.to_delegate());
     io.extend_with(web3.to_delegate());
     io.extend_with(health.to_delegate());
+    io.extend_with(filter.to_delegate());
+    let mut io = PubSubHandler::new(io);
+    io.extend_with(pub_sub.to_delegate());
 
     let http_addr = pnk!(http.parse::<SocketAddr>());
     let http_server = jsonrpc_http_server::ServerBuilder::new(io.clone())
@@ -58,7 +71,7 @@ fn main() {
         .threads(
             available_parallelism()
                 .map(usize::from)
-                .unwrap_or(num_cpus::get()),
+                .unwrap_or_else(|_| num_cpus::get()),
         )
         .keep_alive(true)
         .start_http(&http_addr)

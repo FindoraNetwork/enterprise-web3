@@ -52,6 +52,7 @@ pub struct Web3EvmStackstate<'config> {
 }
 impl<'config> Web3EvmStackstate<'config> {
     #[cfg(feature = "cluster_redis")]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         gas_price: U256,
         chain_id: u32,
@@ -80,6 +81,7 @@ impl<'config> Web3EvmStackstate<'config> {
         }
     }
     #[cfg(not(feature = "cluster_redis"))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         gas_price: U256,
         chain_id: u32,
@@ -144,10 +146,7 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
         let func = || -> ruc::Result<U256> {
             let mut conn = self.pool.get().c(d!())?;
             let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
-            getter
-                .latest_height()
-                .c(d!())
-                .and_then(|val| Ok(U256::from(val)))
+            getter.latest_height().c(d!()).map(U256::from)
         };
         func().unwrap_or_default()
     }
@@ -164,11 +163,7 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
             rx.recv()
                 .c(d!())?
-                .and_then(|response| {
-                    Ok(H160::from_slice(
-                        response.block.header.proposer_address.as_bytes(),
-                    ))
-                })
+                .map(|response| H160::from_slice(response.block.header.proposer_address.as_bytes()))
                 .c(d!())
         };
         func().unwrap_or_default()
@@ -186,7 +181,7 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
                 .get_block_by_hash(block_hash)
                 .c(d!())?
                 .ok_or(eg!())
-                .and_then(|b| Ok(U256::from(b.header.timestamp)))
+                .map(|b| U256::from(b.header.timestamp))
         };
         func().unwrap_or_default()
     }
@@ -203,7 +198,7 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
                 .get_block_by_hash(block_hash)
                 .c(d!())?
                 .ok_or(eg!())
-                .and_then(|b| Ok(U256::from(b.header.difficulty)))
+                .map(|b| b.header.difficulty)
         };
         func().unwrap_or_default()
     }
@@ -220,7 +215,7 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
                 .get_block_by_hash(block_hash)
                 .c(d!())?
                 .ok_or(eg!())
-                .and_then(|b| Ok(U256::from(b.header.gas_limit)))
+                .map(|b| b.header.gas_limit)
         };
         func().unwrap_or_default()
     }
@@ -239,11 +234,7 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
             let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
             let balance = getter.get_balance(self.height, address).c(d!())?;
             let nonce = getter.get_nonce(self.height, address).c(d!())?;
-            Ok(if nonce != U256::zero() && balance != U256::zero() {
-                true
-            } else {
-                false
-            })
+            Ok(nonce != U256::zero() && balance != U256::zero())
         };
         func().unwrap_or_default()
     }
@@ -278,7 +269,7 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
     fn code(&self, address: H160) -> Vec<u8> {
         if let Some(value) = self.code.get(&address) {
-            return value.clone();
+            return value.to_vec();
         }
         let func = || -> ruc::Result<Vec<u8>> {
             let mut conn = self.pool.get().c(d!())?;
@@ -298,7 +289,7 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
     fn storage(&self, address: H160, index: H256) -> H256 {
         if let Some(value) = self.storage.get(&(address, index)) {
-            return value.clone();
+            return *value;
         }
 
         let func = || -> ruc::Result<H256> {
@@ -348,9 +339,10 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
     }
 
     fn exit_commit(&mut self) -> Result<(), evm::ExitError> {
-        let mut exited = *self.parent.take().ok_or(evm::ExitError::Other(Cow::from(
-            "Cannot commit on root substate",
-        )))?;
+        let mut exited = *self
+            .parent
+            .take()
+            .ok_or_else(|| evm::ExitError::Other(Cow::from("Cannot commit on root substate")))?;
         swap(&mut exited, self);
 
         self.metadata.swallow_commit(exited.metadata)?;
@@ -360,18 +352,20 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
     }
 
     fn exit_revert(&mut self) -> Result<(), evm::ExitError> {
-        let mut exited = *self.parent.take().ok_or(evm::ExitError::Other(Cow::from(
-            "Cannot revert on root substate",
-        )))?;
+        let mut exited = *self
+            .parent
+            .take()
+            .ok_or_else(|| evm::ExitError::Other(Cow::from("Cannot revert on root substate")))?;
         swap(&mut exited, self);
         self.metadata.swallow_revert(exited.metadata)?;
         Ok(())
     }
 
     fn exit_discard(&mut self) -> Result<(), evm::ExitError> {
-        let mut exited = *self.parent.take().ok_or(evm::ExitError::Other(Cow::from(
-            "Cannot discard on root substate",
-        )))?;
+        let mut exited = *self
+            .parent
+            .take()
+            .ok_or_else(|| evm::ExitError::Other(Cow::from("Cannot discard on root substate")))?;
         swap(&mut exited, self);
         self.metadata.swallow_discard(exited.metadata)?;
         Ok(())
@@ -417,7 +411,7 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
         let mut keys = vec![];
         for (addr, index) in self.storage.keys() {
             if address == *addr {
-                keys.push((addr.clone(), index.clone()));
+                keys.push((*addr, *index));
             }
         }
         keys.iter().for_each(|key| {

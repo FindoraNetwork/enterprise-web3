@@ -22,7 +22,7 @@ pub fn public_key(tx: &LegacyTransaction) -> Result<[u8; 64]> {
 }
 
 pub fn recover_signer(transaction: &LegacyTransaction) -> Result<H160> {
-    let pubkey = public_key(&transaction)?;
+    let pubkey = public_key(transaction)?;
     Ok(H160::from(H256::from_slice(
         Keccak256::digest(&pubkey).as_slice(),
     )))
