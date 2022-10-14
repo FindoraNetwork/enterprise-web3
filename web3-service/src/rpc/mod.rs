@@ -1,4 +1,5 @@
 pub mod eth;
+pub mod health;
 pub mod net;
 pub mod web3;
 

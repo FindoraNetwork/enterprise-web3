@@ -4,6 +4,7 @@ mod utils;
 mod vm;
 
 use {
+    crate::rpc::health::{HealthApi, HealthApiImpl},
     config::Config,
     jsonrpc_core::IoHandler,
     rpc::{eth::EthService, net::NetApiImpl, web3::Web3ApiImpl},
@@ -44,13 +45,16 @@ fn main() {
 
     let net = NetApiImpl::new();
     let web3 = Web3ApiImpl::new();
+    let health = HealthApiImpl::new();
 
     io.extend_with(eth.to_delegate());
     io.extend_with(net.to_delegate());
     io.extend_with(web3.to_delegate());
+    io.extend_with(health.to_delegate());
 
     let http_addr = pnk!(http.parse::<SocketAddr>());
     let http_server = jsonrpc_http_server::ServerBuilder::new(io.clone())
+        .health_api(("/health", "system_health"))
         .threads(
             available_parallelism()
                 .map(usize::from)
