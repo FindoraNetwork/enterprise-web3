@@ -5,13 +5,13 @@ use {
     redis_versioned_kv::VersionedKVCommand,
 };
 
-pub struct Getter<C> {
-    conn: C,
+pub struct Getter<'a, C> {
+    conn: &'a mut C,
     pub prefix: String,
 }
 
-impl<C: ConnectionLike> Getter<C> {
-    pub fn new(conn: C, prefix: String) -> Self {
+impl<'a, C: ConnectionLike> Getter<'a, C> {
+    pub fn new(conn: &'a mut C, prefix: String) -> Self {
         Self { conn, prefix }
     }
 

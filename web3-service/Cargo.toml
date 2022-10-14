@@ -22,7 +22,9 @@ jsonrpc-ws-server = "18.0"
 jsonrpc-core = "18.0"
 jsonrpc-pubsub = "18.0"
 
-redis = { version = "0.21", default-features = false, features = [ "tls"] }
+redis = { version = "0.21", default-features = false, features = [ "tls", "r2d2" ] }
+r2d2 = { version = "0.8.8"}
+
 tokio = { version = "1.21.0", features = ["full"] }
 env_logger = "0.9.0"
 log = "0.4.14"

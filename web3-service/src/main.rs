@@ -24,18 +24,21 @@ fn main() {
     let http = format!("0.0.0.0:{}", config.http_port);
     let ws = format!("0.0.0.0:{}", config.ws_port);
     #[cfg(feature = "cluster_redis")]
-    let client = Arc::new(pnk!(redis::cluster::ClusterClient::open(
+    let client = pnk!(redis::cluster::ClusterClient::open(
         config.redis_url.clone()
-    )));
+    ));
     #[cfg(not(feature = "cluster_redis"))]
-    let client = Arc::new(pnk!(redis::Client::open(config.redis_url[0].as_ref())));
+    let client = pnk!(redis::Client::open(config.redis_url[0].as_ref()));
+
+    let pool = Arc::new(pnk!(r2d2::Pool::builder().max_size(50).build(client)));
+
     let tendermint_rpc = config.tendermint_url;
 
     let mut io = IoHandler::new();
     let eth = EthService::new(
         config.chain_id,
         config.gas_price,
-        client.clone(),
+        pool.clone(),
         tendermint_rpc.as_str(),
     );
 
