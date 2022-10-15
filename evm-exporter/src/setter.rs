@@ -129,8 +129,8 @@ impl<C: ConnectionLike> Setter<C> {
         let height_key = keys::latest_height_key(&self.prefix);
         let height: Option<String> = self.conn.get(height_key)?;
         let height = match height {
-            Some(str) => (str.parse::<u32>().map_err(|e| Error::ParseIntError(e))?),
-            _ => (0),
+            Some(str) => str.parse::<u32>()?,
+            _ => 0,
         };
         let balance_key = keys::balance_key(&self.prefix, sign_address);
         let balance: Option<String> = self.conn.vkv_get(balance_key, height)?;

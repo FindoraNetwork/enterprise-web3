@@ -311,7 +311,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api balance redis connect error:{:?}",
+                    e
+                ))));
             }
         };
 
@@ -325,7 +328,10 @@ impl EthApi for EthService {
                     }
                 }
                 Err(e) => {
-                    return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                    return Box::pin(future::err(internal_err(format!(
+                        "eth api balance get_pending_balance error:{:?}",
+                        e
+                    ))));
                 }
             }
         };
@@ -333,14 +339,20 @@ impl EthApi for EthService {
         let height = match block_number_to_height(number.clone(), &mut getter) {
             Ok(h) => h,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api balance block_number_to_height error:{:?}",
+                    e
+                ))));
             }
         };
 
         match getter.get_balance(height, address) {
             Ok(balance) => Box::pin(future::ok(balance)),
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api balance get_balance:{:?}",
+                    e
+                ))));
             }
         }
     }
@@ -357,7 +369,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api call redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -371,7 +386,10 @@ impl EthApi for EthService {
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api call block_number_to_height error:{:?}",
+                    e
+                ))));
             }
         };
 
@@ -427,7 +445,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api author redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -435,7 +456,10 @@ impl EthApi for EthService {
         let height = match getter.latest_height() {
             Ok(h) => h,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api author latest_height error:{:?}",
+                    e
+                ))));
             }
         };
         let hash = match getter.get_block_hash_by_height(U256::from(height)) {
@@ -447,7 +471,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api author get_block_hash_by_height error:{:?}",
+                    e
+                ))));
             }
         };
 
@@ -460,7 +487,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api author get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         Box::pin(future::ok(block.header.beneficiary))
@@ -481,7 +511,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_number redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -489,7 +522,10 @@ impl EthApi for EthService {
         match getter.latest_height() {
             Ok(height) => Box::pin(future::ok(U256::from(height))),
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_number latest_height error:{:?}",
+                    e
+                ))));
             }
         }
     }
@@ -504,7 +540,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api storage_at redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -516,19 +555,28 @@ impl EthApi for EthService {
                     }
                 }
                 Err(e) => {
-                    return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                    return Box::pin(future::err(internal_err(format!(
+                        "eth api storage_at get_pending_state error:{:?}",
+                        e
+                    ))));
                 }
             }
         };
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api storage_at block_number_to_height error:{:?}",
+                    e
+                ))));
             }
         };
         match getter.get_state(height, address, H256::from_uint(&index)) {
             Ok(value) => Box::pin(future::ok(value)),
-            Err(e) => Box::pin(future::err(internal_err(e.to_string()))),
+            Err(e) => Box::pin(future::err(internal_err(format!(
+                "eth api storage_at get_state error:{:?}",
+                e
+            )))),
         }
     }
 
@@ -537,7 +585,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_by_hash redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -551,7 +602,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_by_hash get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash.clone()) {
@@ -563,7 +617,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_by_hash get_transaction_status_by_block_hash error:{:?}",
+                    e
+                ))));
             }
         };
         Box::pin(future::ok(Some(Self::rich_block_build(
@@ -582,7 +639,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_by_number redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -590,7 +650,10 @@ impl EthApi for EthService {
         let height = match block_number_to_height(Some(number), &mut getter) {
             Ok(h) => h,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_by_number block_number_to_height error:{:?}",
+                    e
+                ))));
             }
         };
         let hash = match getter.get_block_hash_by_height(U256::from(height)) {
@@ -602,7 +665,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_by_number get_block_hash_by_height error:{:?}",
+                    e
+                ))));
             }
         };
 
@@ -615,7 +681,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_by_number get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let transaction_statuses = match getter.get_transaction_status_by_block_hash(hash.clone()) {
@@ -627,7 +696,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_by_number get_transaction_status_by_block_hash error:{:?}",
+                    e
+                ))));
             }
         };
         Box::pin(future::ok(Some(Self::rich_block_build(
@@ -646,7 +718,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_count redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -658,19 +733,28 @@ impl EthApi for EthService {
                     }
                 }
                 Err(e) => {
-                    return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                    return Box::pin(future::err(internal_err(format!(
+                        "eth api transaction_count get_pending_nonce error:{:?}",
+                        e
+                    ))));
                 }
             }
         };
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_count block_number_to_height error:{:?}",
+                    e
+                ))));
             }
         };
         match getter.get_nonce(height, address) {
             Ok(nonce) => Box::pin(future::ok(nonce)),
-            Err(e) => Box::pin(future::err(internal_err(e.to_string()))),
+            Err(e) => Box::pin(future::err(internal_err(format!(
+                "eth api transaction_count get_nonce error:{:?}",
+                e
+            )))),
         }
     }
 
@@ -679,7 +763,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_transaction_count_by_hash redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -692,7 +779,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_transaction_count_by_hash get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         Box::pin(future::ok(Some(U256::from(block.transactions.len()))))
@@ -706,7 +796,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_transaction_count_by_number redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -714,7 +807,10 @@ impl EthApi for EthService {
         let height = match block_number_to_height(Some(number), &mut getter) {
             Ok(h) => h,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_transaction_count_by_number block_number_to_height error:{:?}",
+                    e
+                ))));
             }
         };
         let hash = match getter.get_block_hash_by_height(U256::from(height)) {
@@ -726,7 +822,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_transaction_count_by_number get_block_hash_by_height error:{:?}",
+                    e
+                ))));
             }
         };
 
@@ -739,7 +838,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api block_transaction_count_by_number get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         Box::pin(future::ok(Some(U256::from(block.transactions.len()))))
@@ -764,7 +866,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api code_at redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -776,19 +881,28 @@ impl EthApi for EthService {
                     }
                 }
                 Err(e) => {
-                    return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                    return Box::pin(future::err(internal_err(format!(
+                        "eth api code_at get_pending_byte_code error:{:?}",
+                        e
+                    ))));
                 }
             }
         };
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api code_at block_number_to_height error:{:?}",
+                    e
+                ))));
             }
         };
         match getter.get_byte_code(height, address) {
             Ok(code) => Box::pin(future::ok(code.into())),
-            Err(e) => Box::pin(future::err(internal_err(e.to_string()))),
+            Err(e) => Box::pin(future::err(internal_err(format!(
+                "eth api code_at get_byte_code error:{:?}",
+                e
+            )))),
         }
     }
 
@@ -796,7 +910,10 @@ impl EthApi for EthService {
         let transaction = match rlp::decode::<LegacyTransaction>(&bytes.0[..]) {
             Ok(transaction) => transaction,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api send_raw_transaction decode tx error:{:?}",
+                    e
+                ))));
             }
         };
         log::info!(target: "eth api", "send_raw_transaction bytes:{:?}", &transaction);
@@ -804,8 +921,13 @@ impl EthApi for EthService {
         let transaction_hash =
             H256::from_slice(Keccak256::digest(&rlp::encode(&transaction)).as_slice());
 
-        let txn = serde_json::to_vec(&UncheckedTransaction::new_unsigned(transaction))
-            .map_err(internal_err);
+        let txn =
+            serde_json::to_vec(&UncheckedTransaction::new_unsigned(transaction)).map_err(|e| {
+                internal_err(format!(
+                    "eth api send_raw_transaction serde_json::to_vec tx error:{:?}",
+                    e
+                ))
+            });
 
         if let Err(e) = txn {
             return Box::pin(future::err(e));
@@ -817,18 +939,20 @@ impl EthApi for EthService {
         let (tx, rx) = mpsc::channel();
         RT.spawn(async move {
             let resp = client.broadcast_tx_sync(txn_with_tag.into()).await;
-            println!("resp:{:?}", resp);
             tx.send(resp).unwrap();
         });
 
         // fetch response
         if let Ok(resp) = rx.recv().unwrap() {
             if resp.code != Code::Ok {
-                return Box::pin(future::err(internal_err(resp.log)));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api send_raw_transaction rx.recv() error:{:?}",
+                    resp.log
+                ))));
             }
         } else {
             return Box::pin(future::err(internal_err(String::from(
-                "send_raw_transaction: broadcast_tx_sync failed",
+                "eth api send_raw_transaction: broadcast_tx_sync failed",
             ))));
         }
         Box::pin(future::ok(transaction_hash))
@@ -843,7 +967,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api estimate_gas redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -855,7 +982,10 @@ impl EthApi for EthService {
         let height = match block_number_to_height(number, &mut getter) {
             Ok(h) => h,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api estimate_gas block_number_to_height error:{:?}",
+                    e
+                ))));
             }
         };
         let block = match getter.get_block_hash_by_height(U256::from(height)) {
@@ -864,7 +994,10 @@ impl EthApi for EthService {
                     match getter.get_block_by_hash(hash.clone()) {
                         Ok(value) => value,
                         Err(e) => {
-                            return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                            return Box::pin(future::err(internal_err(format!(
+                                "eth api estimate_gas get_block_by_hash error:{:?}",
+                                e
+                            ))));
                         }
                     }
                 } else {
@@ -872,7 +1005,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api estimate_gas get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let mut highest = if let Some(gas) = request.gas {
@@ -890,14 +1026,17 @@ impl EthApi for EthService {
                 let balance = match getter.get_balance(height, from) {
                     Ok(balance) => balance,
                     Err(e) => {
-                        return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                        return Box::pin(future::err(internal_err(format!(
+                            "eth api estimate_gas get_balance error:{:?}",
+                            e
+                        ))));
                     }
                 };
                 let mut available = balance;
                 if let Some(value) = request.value {
                     if value > available {
                         return Box::pin(future::err(internal_err(
-                            "insufficient funds for transfer",
+                            "eth api estimate_gas insufficient funds for transfer",
                         )));
                     }
                     available -= value;
@@ -1003,7 +1142,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_hash redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -1016,7 +1158,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_hash get_transaction_index_by_tx_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let block = match getter.get_block_by_hash(hash.clone()) {
@@ -1028,7 +1173,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_hash get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let transaction = if let Some(hash_index) = block.transactions.get(index as usize) {
@@ -1045,7 +1193,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_hash get_transaction_status_by_block_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let transaction_status = if let Some(status) = transaction_statuses.get(index as usize) {
@@ -1069,7 +1220,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_block_hash_and_index redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -1082,7 +1236,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_block_hash_and_index get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let transaction = if let Some(hash_index) = block.transactions.get(index.value()) {
@@ -1099,7 +1256,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_block_hash_and_index get_transaction_status_by_block_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let transaction_status = if let Some(status) = transaction_statuses.get(index.value()) {
@@ -1123,7 +1283,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_block_number_and_index redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -1131,7 +1294,10 @@ impl EthApi for EthService {
         let height = match block_number_to_height(Some(number), &mut getter) {
             Ok(h) => h,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_block_number_and_index block_number_to_height error:{:?}",
+                    e
+                ))));
             }
         };
         let hash = match getter.get_block_hash_by_height(U256::from(height)) {
@@ -1143,7 +1309,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_block_number_and_index get_block_hash_by_height error:{:?}",
+                    e
+                ))));
             }
         };
 
@@ -1156,7 +1325,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_block_number_and_index get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let transaction = if let Some(hash_index) = block.transactions.get(index.value()) {
@@ -1173,7 +1345,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_by_block_number_and_index get_transaction_status_by_block_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let transaction_status = if let Some(status) = transaction_statuses.get(index.value()) {
@@ -1193,7 +1368,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_receipt redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -1206,7 +1384,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_receipt get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let block = match getter.get_block_by_hash(hash.clone()) {
@@ -1218,7 +1399,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_receipt get_block_by_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let statuses = match getter.get_transaction_status_by_block_hash(hash) {
@@ -1230,7 +1414,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_receipt get_transaction_status_by_block_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let status = statuses[index as usize].clone();
@@ -1244,7 +1431,10 @@ impl EthApi for EthService {
                 }
             }
             Err(e) => {
-                return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api transaction_receipt get_transaction_receipt_by_block_hash error:{:?}",
+                    e
+                ))));
             }
         };
         let receipt = receipts[index as usize].clone();
@@ -1342,7 +1532,10 @@ impl EthApi for EthService {
         let mut conn = match self.pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                return Box::pin(future::err(internal_err(e.to_string())));
+                return Box::pin(future::err(internal_err(format!(
+                    "eth api logs redis connect error:{:?}",
+                    e
+                ))));
             }
         };
         let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
@@ -1358,7 +1551,10 @@ impl EthApi for EthService {
                     }
                 }
                 Err(e) => {
-                    return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                    return Box::pin(future::err(internal_err(format!(
+                        "eth api logs get_block_by_hash error:{:?}",
+                        e
+                    ))));
                 }
             };
 
@@ -1369,14 +1565,20 @@ impl EthApi for EthService {
                     }
                 }
                 Err(e) => {
-                    return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                    return Box::pin(future::err(internal_err(format!(
+                        "eth api logs get_transaction_status_by_block_hash error:{:?}",
+                        e
+                    ))));
                 }
             };
         } else {
             let current_number = match getter.latest_height() {
                 Ok(height) => height,
                 Err(e) => {
-                    return Box::pin(future::err(internal_err(e.to_string())));
+                    return Box::pin(future::err(internal_err(format!(
+                        "eth api logs latest_height error:{:?}",
+                        e
+                    ))));
                 }
             };
 
@@ -1422,11 +1624,16 @@ impl EthApi for EthService {
                         if let Some(hash) = value {
                             hash
                         } else {
-                            return Box::pin(future::err(internal_err(String::new())));
+                            return Box::pin(future::err(internal_err(format!(
+                                "eth api logs get_block_hash_by_height return none",
+                            ))));
                         }
                     }
                     Err(e) => {
-                        return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                        return Box::pin(future::err(internal_err(format!(
+                            "eth api logs get_block_hash_by_height error:{:?}",
+                            e
+                        ))));
                     }
                 };
 
@@ -1435,11 +1642,16 @@ impl EthApi for EthService {
                         if let Some(b) = value {
                             b
                         } else {
-                            return Box::pin(future::err(internal_err(String::new())));
+                            return Box::pin(future::err(internal_err(format!(
+                                "eth api logs get_block_by_hash return none",
+                            ))));
                         }
                     }
                     Err(e) => {
-                        return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                        return Box::pin(future::err(internal_err(format!(
+                            "eth api logs get_block_by_hash error:{:?}",
+                            e
+                        ))));
                     }
                 };
 
@@ -1458,7 +1670,10 @@ impl EthApi for EthService {
                             }
                         }
                         Err(e) => {
-                            return Box::pin(future::err(internal_err(format!("{:?}", e))));
+                            return Box::pin(future::err(internal_err(format!(
+                                "eth api logs get_transaction_status_by_block_hash error:{:?}",
+                                e
+                            ))));
                         }
                     };
                 }
