@@ -313,7 +313,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api balance redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -330,7 +330,7 @@ impl EthApi for EthService {
                 Err(e) => {
                     return Box::pin(future::err(internal_err(format!(
                         "eth api balance get_pending_balance error:{:?}",
-                        e
+                        e.to_string()
                     ))));
                 }
             }
@@ -341,7 +341,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api balance block_number_to_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -351,7 +351,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api balance get_balance:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         }
@@ -371,7 +371,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api call redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -388,7 +388,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api call block_number_to_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -447,7 +447,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api author redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -458,7 +458,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api author latest_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -473,7 +473,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api author get_block_hash_by_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -489,7 +489,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api author get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -513,7 +513,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_number redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -524,7 +524,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_number latest_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         }
@@ -542,7 +542,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api storage_at redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -557,7 +557,7 @@ impl EthApi for EthService {
                 Err(e) => {
                     return Box::pin(future::err(internal_err(format!(
                         "eth api storage_at get_pending_state error:{:?}",
-                        e
+                        e.to_string()
                     ))));
                 }
             }
@@ -567,7 +567,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api storage_at block_number_to_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -575,7 +575,7 @@ impl EthApi for EthService {
             Ok(value) => Box::pin(future::ok(value)),
             Err(e) => Box::pin(future::err(internal_err(format!(
                 "eth api storage_at get_state error:{:?}",
-                e
+                e.to_string()
             )))),
         }
     }
@@ -587,7 +587,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_by_hash redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -604,7 +604,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_by_hash get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -619,7 +619,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_by_hash get_transaction_status_by_block_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -641,7 +641,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_by_number redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -652,7 +652,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_by_number block_number_to_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -667,7 +667,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_by_number get_block_hash_by_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -683,7 +683,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_by_number get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -698,7 +698,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_by_number get_transaction_status_by_block_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -720,7 +720,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_count redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -735,7 +735,7 @@ impl EthApi for EthService {
                 Err(e) => {
                     return Box::pin(future::err(internal_err(format!(
                         "eth api transaction_count get_pending_nonce error:{:?}",
-                        e
+                        e.to_string()
                     ))));
                 }
             }
@@ -745,7 +745,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_count block_number_to_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -753,7 +753,7 @@ impl EthApi for EthService {
             Ok(nonce) => Box::pin(future::ok(nonce)),
             Err(e) => Box::pin(future::err(internal_err(format!(
                 "eth api transaction_count get_nonce error:{:?}",
-                e
+                e.to_string()
             )))),
         }
     }
@@ -765,7 +765,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_transaction_count_by_hash redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -781,7 +781,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_transaction_count_by_hash get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -798,7 +798,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_transaction_count_by_number redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -809,7 +809,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_transaction_count_by_number block_number_to_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -824,7 +824,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_transaction_count_by_number get_block_hash_by_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -840,7 +840,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api block_transaction_count_by_number get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -868,7 +868,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api code_at redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -883,7 +883,7 @@ impl EthApi for EthService {
                 Err(e) => {
                     return Box::pin(future::err(internal_err(format!(
                         "eth api code_at get_pending_byte_code error:{:?}",
-                        e
+                        e.to_string()
                     ))));
                 }
             }
@@ -893,7 +893,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api code_at block_number_to_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -901,7 +901,7 @@ impl EthApi for EthService {
             Ok(code) => Box::pin(future::ok(code.into())),
             Err(e) => Box::pin(future::err(internal_err(format!(
                 "eth api code_at get_byte_code error:{:?}",
-                e
+                e.to_string()
             )))),
         }
     }
@@ -912,7 +912,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api send_raw_transaction decode tx error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -925,7 +925,7 @@ impl EthApi for EthService {
             serde_json::to_vec(&UncheckedTransaction::new_unsigned(transaction)).map_err(|e| {
                 internal_err(format!(
                     "eth api send_raw_transaction serde_json::to_vec tx error:{:?}",
-                    e
+                    e.to_string()
                 ))
             });
 
@@ -969,7 +969,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api estimate_gas redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -984,7 +984,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api estimate_gas block_number_to_height error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -996,7 +996,7 @@ impl EthApi for EthService {
                         Err(e) => {
                             return Box::pin(future::err(internal_err(format!(
                                 "eth api estimate_gas get_block_by_hash error:{:?}",
-                                e
+                                e.to_string()
                             ))));
                         }
                     }
@@ -1007,7 +1007,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api estimate_gas get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1028,7 +1028,7 @@ impl EthApi for EthService {
                     Err(e) => {
                         return Box::pin(future::err(internal_err(format!(
                             "eth api estimate_gas get_balance error:{:?}",
-                            e
+                            e.to_string()
                         ))));
                     }
                 };
@@ -1144,7 +1144,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_hash redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1160,7 +1160,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_hash get_transaction_index_by_tx_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1175,7 +1175,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_hash get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1195,7 +1195,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_hash get_transaction_status_by_block_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1222,7 +1222,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_block_hash_and_index redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1238,7 +1238,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_block_hash_and_index get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1258,7 +1258,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_block_hash_and_index get_transaction_status_by_block_hash error:{:?}",
-                    e
+                e.to_string()
                 ))));
             }
         };
@@ -1285,7 +1285,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_block_number_and_index redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1296,7 +1296,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_block_number_and_index block_number_to_height error:{:?}",
-                    e
+                e.to_string()
                 ))));
             }
         };
@@ -1311,7 +1311,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_block_number_and_index get_block_hash_by_height error:{:?}",
-                    e
+                e.to_string()
                 ))));
             }
         };
@@ -1327,7 +1327,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_block_number_and_index get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1347,7 +1347,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_by_block_number_and_index get_transaction_status_by_block_hash error:{:?}",
-                    e
+                e.to_string()
                 ))));
             }
         };
@@ -1370,7 +1370,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_receipt redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1386,7 +1386,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_receipt get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1401,7 +1401,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_receipt get_block_by_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1416,7 +1416,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_receipt get_transaction_status_by_block_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1433,7 +1433,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api transaction_receipt get_transaction_receipt_by_block_hash error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1534,7 +1534,7 @@ impl EthApi for EthService {
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
                     "eth api logs redis connect error:{:?}",
-                    e
+                    e.to_string()
                 ))));
             }
         };
@@ -1553,7 +1553,7 @@ impl EthApi for EthService {
                 Err(e) => {
                     return Box::pin(future::err(internal_err(format!(
                         "eth api logs get_block_by_hash error:{:?}",
-                        e
+                        e.to_string()
                     ))));
                 }
             };
@@ -1567,7 +1567,7 @@ impl EthApi for EthService {
                 Err(e) => {
                     return Box::pin(future::err(internal_err(format!(
                         "eth api logs get_transaction_status_by_block_hash error:{:?}",
-                        e
+                        e.to_string()
                     ))));
                 }
             };
@@ -1577,7 +1577,7 @@ impl EthApi for EthService {
                 Err(e) => {
                     return Box::pin(future::err(internal_err(format!(
                         "eth api logs latest_height error:{:?}",
-                        e
+                        e.to_string()
                     ))));
                 }
             };
@@ -1632,7 +1632,7 @@ impl EthApi for EthService {
                     Err(e) => {
                         return Box::pin(future::err(internal_err(format!(
                             "eth api logs get_block_hash_by_height error:{:?}",
-                            e
+                            e.to_string()
                         ))));
                     }
                 };
@@ -1650,7 +1650,7 @@ impl EthApi for EthService {
                     Err(e) => {
                         return Box::pin(future::err(internal_err(format!(
                             "eth api logs get_block_by_hash error:{:?}",
-                            e
+                            e.to_string()
                         ))));
                     }
                 };
@@ -1672,7 +1672,7 @@ impl EthApi for EthService {
                         Err(e) => {
                             return Box::pin(future::err(internal_err(format!(
                                 "eth api logs get_transaction_status_by_block_hash error:{:?}",
-                                e
+                                e.to_string()
                             ))));
                         }
                     };
