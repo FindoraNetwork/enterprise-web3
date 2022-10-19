@@ -1,4 +1,4 @@
-state_db_path = "/tmp/state.db/"
-history_db_path = "/tmp/history.db/"
+state_db_path = "/rocksdb-exporter/data/ledger/state.db"
+history_db_path = "/rocksdb-exporter/data/ledger/history.db"
 redis_url = ["redis://127.0.0.1:6379/0"]
 clear = true

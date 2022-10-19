@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: web3-service
+  name: web3-service
+  namespace: enterprise-web3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web3-service
+  template:
+    metadata:
+      labels:
+        app: web3-service
+    spec:
+      containers:
+        - name: web3-service
+          image: 197320162446.dkr.ecr.us-west-2.amazonaws.com/web3-service:latest
+          ports:
+            - containerPort: 8545
+            - containerPort: 8546
+          volumeMounts:
+            - mountPath: /web3-service/web3-service-config.toml
+              name: web3-service-config
+
+      restartPolicy: Always
+      volumes:
+        - name: web3-service-config
+          configMap:
+            name: web3-service-config

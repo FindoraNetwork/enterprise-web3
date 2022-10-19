@@ -8,16 +8,13 @@ WORKDIR /enterprise-web3
 RUN cargo build --release
 
 RUN mkdir /enterprise-web3-binaries
-RUN cp rocksdb-exporter/run_rocksdb_exporter.sh /enterprise-web3-binaries
 RUN cp target/release/rocksdb-exporter /enterprise-web3-binaries
 RUN cp target/release/web3-service /enterprise-web3-binaries
 
 RUN strip --strip-all /enterprise-web3-binaries/rocksdb-exporter
 RUN strip --strip-all /enterprise-web3-binaries/web3-service
 
-FROM docker.io/busybox:latest
+FROM scratch
 
-COPY --from=builder /enterprise-web3-binaries/rocksdb-exporter /rocksdb-exporter
-COPY --from=builder /enterprise-web3-binaries/run_rocksdb_exporter.sh /run_rocksdb_exporter.sh
-
-COPY --from=builder /enterprise-web3-binaries/web3-service /web3-service
+COPY --from=builder /enterprise-web3-binaries /enterprise-web3-binaries
+COPY redis-versioned-kv/lua/versioned-kv.lua /enterprise-web3-binaries/versioned-kv.lua
