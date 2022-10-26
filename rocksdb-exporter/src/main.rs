@@ -49,7 +49,7 @@ fn main() {
         if let Some((block, receipts, statuses)) = info {
             let receipts = receipts
                 .into_iter()
-                .map(|item| ethereum::ReceiptAny::Frontier(item))
+                .map(ethereum::ReceiptAny::Frontier)
                 .collect::<Vec<_>>();
             pnk!(setter.set_block_info(block.into(), receipts, statuses));
         } else {

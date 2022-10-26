@@ -12,7 +12,6 @@ evm = { version = "0.35.0", default-features = false, features = ["with-serde"] 
 ethereum = { version = "0.12.0", default-features = false, features = ["with-serde"] }
 evm-exporter = { path = "../evm-exporter" }
 
-
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
@@ -33,17 +32,20 @@ reqwest = { version = "0.11", features = ["json", "native-tls-vendored", "blocki
 ovr-eth-utils = { git = "https://github.com/Overealityio/ovr-eth-utils", rev = "ca83d6adb0396c06e05d1fd4c18a371de163ed58", features = ["with_common_precompiles"] }
 
 tendermint = { git = "https://github.com/FindoraNetwork/tendermint-rs", tag = "v0.19.0a-fk" }
-tendermint-rpc = { git = "https://github.com/FindoraNetwork/tendermint-rs", features = ["http-client", "websocket-client"], tag = "v0.19.0a-fk" }
+tendermint-rpc = { git = "https://github.com/FindoraNetwork/tendermint-rs", features = ["http-client"], tag = "v0.19.0a-fk" }
 
 lazy_static = "1.4.0"
 once_cell = "1.10.0"
 ruc = "2.0"
 rlp = "0.5"
-sha3 = "0.8"
+sha2 = "0.10"
+sha3 = "0.10"
 hex = "0.4.3"
 num_cpus = "1.13"
-futures = "0.3.16"
+futures = { version = "0.3.16", features = ["compat", "thread-pool"] }
 toml = "0.5.8"
+parking_lot = "0.12"
+base64 = "0.12"
 
 [features]
 default = []

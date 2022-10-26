@@ -55,14 +55,13 @@ impl PrecompileSet for Web3EvmPrecompiles {
     ) -> Option<PrecompileResult> {
         PRECOMPILE_SET
             .get(&address)
-            .and_then(|f| Some(f(input, target_gas, context, is_static)))
+            .map(|f| f(input, target_gas, context, is_static))
     }
 
     fn is_precompile(&self, address: H160) -> bool {
         std::vec![1, 2, 3, 4, 5, 1024, 1025]
             .into_iter()
             .map(idx_to_h160)
-            .collect::<Vec<_>>()
-            .contains(&address)
+            .any(|x| x == address)
     }
 }
