@@ -14,6 +14,7 @@ use {
     },
     config::Config,
     jsonrpc_core::MetaIoHandler,
+    jsonrpc_http_server::DomainsValidation,
     jsonrpc_pubsub::PubSubHandler,
     rpc::{eth::EthService, eth_filter::EthFilterApiImpl, net::NetApiImpl, web3::Web3ApiImpl},
     ruc::*,
@@ -41,7 +42,6 @@ fn main() {
 
     let pool = Arc::new(pnk!(r2d2::Pool::builder().max_size(50).build(client)));
 
-    let mut io = MetaIoHandler::default();
     let eth = EthService::new(
         config.chain_id,
         config.gas_price,
@@ -57,6 +57,7 @@ fn main() {
     pnk!(subscriber_notify.start());
     let pub_sub = EthPubSubApiImpl::new(pool, subscriber_notify);
 
+    let mut io = MetaIoHandler::default();
     io.extend_with(eth.to_delegate());
     io.extend_with(net.to_delegate());
     io.extend_with(web3.to_delegate());
@@ -78,12 +79,28 @@ fn main() {
         .expect("failed to create http server");
     thread::spawn(move || {
         let ws_addr = pnk!(ws.parse::<SocketAddr>());
-        let ws_server = jsonrpc_ws_server::ServerBuilder::new(io)
-            .start(&ws_addr)
-            .expect("failed to create ws server");
+        let ws_server = jsonrpc_ws_server::ServerBuilder::with_meta_extractor(
+            io,
+            |context: &jsonrpc_ws_server::RequestContext| context.sender().into(),
+        )
+        .max_payload(15 * 1024 * 1024)
+        .max_connections(100)
+        .allowed_origins(map_cors(Some(&vec!["*".to_string()])))
+        .start(&ws_addr)
+        .expect("failed to create ws server");
         println!("*** Web3-websocket serve at {} ***", ws);
         pnk!(ws_server.wait());
     });
     println!("*** Web3-http serve at {} ***", http);
     http_server.wait();
+}
+
+fn map_cors<T: for<'a> From<&'a str>>(cors: Option<&Vec<String>>) -> DomainsValidation<T> {
+    cors.map(|x| {
+        x.iter()
+            .map(AsRef::as_ref)
+            .map(Into::into)
+            .collect::<Vec<_>>()
+    })
+    .into()
 }
