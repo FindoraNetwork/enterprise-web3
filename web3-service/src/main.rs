@@ -5,24 +5,28 @@ mod utils;
 mod vm;
 
 use {
-    crate::{
-        notify::SubscriberNotify,
-        rpc::{
-            eth_pubsub::EthPubSubApiImpl,
-            health::{HealthApi, HealthApiImpl},
-        },
-    },
     config::Config,
     jsonrpc_core::MetaIoHandler,
     jsonrpc_http_server::DomainsValidation,
     jsonrpc_pubsub::PubSubHandler,
-    rpc::{eth::EthService, eth_filter::EthFilterApiImpl, net::NetApiImpl, web3::Web3ApiImpl},
+    notify::SubscriberNotify,
+    rpc::{
+        debug::DebugApiImpl,
+        debugapi::debug::DebugApi,
+        eth::EthService,
+        eth_filter::EthFilterApiImpl,
+        eth_pubsub::EthPubSubApiImpl,
+        health::{HealthApi, HealthApiImpl},
+        net::NetApiImpl,
+        web3::Web3ApiImpl,
+    },
     ruc::*,
     std::{
         net::SocketAddr,
         sync::Arc,
         thread::{self, available_parallelism},
     },
+    tendermint_rpc::HttpClient,
     web3_rpc_core::{EthApi, EthFilterApi, EthPubSubApi, NetApi, Web3Api},
 };
 
@@ -39,18 +43,17 @@ fn main() {
     ));
     #[cfg(not(feature = "cluster_redis"))]
     let client = pnk!(redis::Client::open(config.redis_url[0].as_ref()));
-
     let pool = Arc::new(pnk!(r2d2::Pool::builder().max_size(50).build(client)));
-
+    let tm_client = Arc::new(pnk!(HttpClient::new(config.tendermint_url.as_str())));
     let eth = EthService::new(
         config.chain_id,
         config.gas_price,
         pool.clone(),
-        &config.tendermint_url,
+        tm_client.clone(),
     );
-
     let net = NetApiImpl::new();
     let web3 = Web3ApiImpl::new();
+    let debug = DebugApiImpl::new(config.chain_id, config.gas_price, pool.clone(), tm_client);
     let health = HealthApiImpl::new();
     let filter = EthFilterApiImpl::new(pool.clone());
     let subscriber_notify = Arc::new(SubscriberNotify::new(pool.clone(), &config.tendermint_url));
@@ -61,6 +64,7 @@ fn main() {
     io.extend_with(eth.to_delegate());
     io.extend_with(net.to_delegate());
     io.extend_with(web3.to_delegate());
+    io.extend_with(debug.to_delegate());
     io.extend_with(health.to_delegate());
     io.extend_with(filter.to_delegate());
     let mut io = PubSubHandler::new(io);

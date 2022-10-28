@@ -17,7 +17,6 @@ use {
     evm_exporter::{utils::public_key, Getter, TransactionStatus, PREFIX},
     jsonrpc_core::{futures::future, BoxFuture, Error, ErrorCode, Result, Value},
     lazy_static::lazy_static,
-    ruc::{pnk, RucResult},
     sha3::{Digest, Keccak256},
     std::{
         collections::BTreeMap,
@@ -60,13 +59,13 @@ impl EthService {
         chain_id: u32,
         gas_price: u64,
         pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
-        tm_url: &str,
+        tm_client: Arc<HttpClient>,
     ) -> Self {
         Self {
             chain_id,
             gas_price,
             client,
-            tm_client: Arc::new(pnk!(HttpClient::new(tm_url))),
+            tm_client,
         }
     }
     #[cfg(not(feature = "cluster_redis"))]
@@ -74,13 +73,13 @@ impl EthService {
         chain_id: u32,
         gas_price: u64,
         pool: Arc<r2d2::Pool<redis::Client>>,
-        tm_url: &str,
+        tm_client: Arc<HttpClient>,
     ) -> Self {
         Self {
             chain_id,
             gas_price,
             pool,
-            tm_client: Arc::new(pnk!(HttpClient::new(tm_url))),
+            tm_client,
         }
     }
 
