@@ -33,7 +33,7 @@ impl SubscriberNotify {
     pub fn new(client: Arc<redis::cluster::ClusterClient>, tm_url: &str) -> Self {
         Self {
             tm_url: String::from(tm_url),
-            millis: 100,
+            millis: 2000,
             client,
             tm_client,
             logs_event_notify: Arc::new(Notifications::new()),
@@ -47,7 +47,7 @@ impl SubscriberNotify {
     pub fn new(redis_pool: Arc<r2d2::Pool<redis::Client>>, tm_url: &str) -> Self {
         Self {
             tm_url: String::from(tm_url),
-            millis: 100,
+            millis: 2000,
             redis_pool,
             logs_event_notify: Arc::new(Notifications::new()),
             new_heads_event_notify: Arc::new(Notifications::new()),
