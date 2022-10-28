@@ -1,4 +1,4 @@
-FROM enterprise-web3 AS fundation
+FROM 197320162446.dkr.ecr.us-west-2.amazonaws.com/enterprise-web3:latest AS fundation
   
 FROM debian:bullseye-slim
 RUN apt-get update -y && apt-get install -y ca-certificates
