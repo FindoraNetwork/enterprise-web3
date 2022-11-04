@@ -12,7 +12,7 @@ use {
     notify::SubscriberNotify,
     rpc::{
         debug::DebugApiImpl,
-        debugapi::debug::DebugApi,
+        debugapi::{debug::DebugApi, jsvm::params::init_upstream},
         eth::EthService,
         eth_filter::EthFilterApiImpl,
         eth_pubsub::EthPubSubApiImpl,
@@ -44,6 +44,7 @@ fn main() {
     #[cfg(not(feature = "cluster_redis"))]
     let client = pnk!(redis::Client::open(config.redis_url[0].as_ref()));
     let pool = Arc::new(pnk!(r2d2::Pool::builder().max_size(50).build(client)));
+    pnk!(init_upstream(pool.clone()));
     let tm_client = Arc::new(pnk!(HttpClient::new(config.tendermint_url.as_str())));
     let eth = EthService::new(
         config.chain_id,

@@ -65,6 +65,12 @@ impl<'a, C: ConnectionLike> Getter<'a, C> {
         })
     }
 
+    pub fn addr_state_exists(&mut self, height: u32, address: H160) -> Result<bool> {
+        let state_addr_key = keys::state_addr_key(&self.prefix, address);
+        let value: Option<String> = self.conn.vkv_get(state_addr_key, height)?;
+        Ok(value.is_some())
+    }
+
     pub fn get_state(&mut self, height: u32, address: H160, index: H256) -> Result<H256> {
         let state_key = keys::state_key(&self.prefix, address, index);
         let value: Option<String> = self.conn.vkv_get(state_key, height)?;

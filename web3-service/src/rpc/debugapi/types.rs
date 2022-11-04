@@ -1,10 +1,11 @@
 use {
     ethereum_types::{H256, U256},
+    evm::Opcode,
     serde::{Deserialize, Serialize},
     std::collections::BTreeMap,
 };
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraceParams {
     pub disable_storage: Option<bool>,
     pub disable_memory: Option<bool>,
@@ -12,15 +13,33 @@ pub struct TraceParams {
     pub tracer: Option<String>,
     pub timeout: Option<String>,
 }
-
-#[derive(Serialize)]
-pub struct TransactionTrace {
-    pub gas: U256,
-    pub return_value: Vec<u8>,
-    pub step_logs: Vec<RawStepLog>,
+#[derive(Clone, Serialize)]
+pub enum CallType {
+    Call,
+    CallCode,
+    DelegateCall,
+    StaticCall,
 }
 
-#[derive(Debug, Serialize)]
+pub enum ContextType {
+    Call(CallType),
+    Create,
+}
+
+impl ContextType {
+    pub fn from(opcode: Opcode) -> Option<Self> {
+        match opcode {
+            Opcode::CREATE | Opcode::CREATE2 => Some(ContextType::Create),
+            Opcode::CALL => Some(ContextType::Call(CallType::Call)),
+            Opcode::CALLCODE => Some(ContextType::Call(CallType::CallCode)),
+            Opcode::DELEGATECALL => Some(ContextType::Call(CallType::DelegateCall)),
+            Opcode::STATICCALL => Some(ContextType::Call(CallType::StaticCall)),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
 pub struct RawStepLog {
     pub depth: U256,
     pub gas: U256,
@@ -33,4 +52,11 @@ pub struct RawStepLog {
     pub stack: Option<Vec<H256>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage: Option<BTreeMap<H256, H256>>,
+}
+
+#[derive(Serialize)]
+pub struct TransactionTrace {
+    pub(crate) gas: U256,
+    pub(crate) return_value: Vec<u8>,
+    pub(crate) step_logs: Vec<RawStepLog>,
 }

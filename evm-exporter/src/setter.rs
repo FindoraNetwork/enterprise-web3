@@ -66,6 +66,9 @@ impl<C: ConnectionLike> Setter<C> {
         let key = keys::state_key(&self.prefix, address, index);
         self.conn
             .vkv_set(key, height, serde_json::to_string(&value)?)?;
+        let state_addr_key = keys::state_addr_key(&self.prefix, address);
+        self.conn
+            .vkv_set(state_addr_key.clone(), height, state_addr_key)?;
         Ok(())
     }
 

@@ -15,7 +15,9 @@ pub fn nonce_key(prefix: &str, addr: H160) -> String {
 pub fn hex_u256(u256: U256) -> String {
     format!("{:#064x}", u256)
 }
-
+pub fn state_addr_key(prefix: &str, addr: H160) -> String {
+    format!("{}:state:addr.{}", prefix, hex::encode(addr),)
+}
 pub fn state_key(prefix: &str, addr: H160, index: H256) -> String {
     format!(
         "{}:state:addr.{}:index:u256.{}",

@@ -2,8 +2,9 @@ use {
     super::{
         debugapi::{
             debug::DebugApi,
-            event_listener::DebugEventListener,
-            types::{TraceParams, TransactionTrace},
+            event_listener::{ContractInfo, DebugEventListener},
+            jsvm::func::parse_tracer,
+            types::TraceParams,
         },
         internal_err,
     },
@@ -11,12 +12,17 @@ use {
         utils::block_number_to_height,
         vm::{precompile::Web3EvmPrecompiles, stack::Web3EvmStackstate},
     },
+    chrono::{DateTime, NaiveDateTime, UTC},
     ethereum::{TransactionAction, TransactionV2},
     ethereum_types::{H160, H256, U256},
-    evm::executor::stack::{StackExecutor, StackSubstateMetadata},
+    evm::{
+        executor::stack::{StackExecutor, StackSubstateMetadata},
+        CreateScheme::Legacy,
+        ExitError, ExitReason,
+    },
     evm_exporter::{utils::recover_signer, Getter, PREFIX},
-    jsonrpc_core::{Error, Result},
-    std::sync::Arc,
+    jsonrpc_core::{Error, Result, Value},
+    std::sync::{Arc, Mutex},
     tendermint_rpc::HttpClient,
     web3_rpc_core::types::{BlockNumber, CallRequest},
 };
@@ -34,6 +40,7 @@ pub struct DebugApiImpl {
     gas_price: u64,
     pool: Arc<r2d2::Pool<redis::Client>>,
     tm_client: Arc<HttpClient>,
+    mutex: Mutex<bool>,
 }
 impl DebugApiImpl {
     #[cfg(feature = "cluster_redis")]
@@ -62,8 +69,10 @@ impl DebugApiImpl {
             gas_price,
             pool,
             tm_client,
+            mutex: Mutex::new(true),
         }
     }
+
     fn trace_evm(
         &self,
         from: H160,
@@ -72,7 +81,13 @@ impl DebugApiImpl {
         data: Vec<u8>,
         height: u32,
         params: Option<TraceParams>,
-    ) -> Result<TransactionTrace> {
+        time: DateTime<UTC>,
+        block: U256,
+        block_hash: H256,
+        tx_index: U256,
+        tx_hash: H256,
+    ) -> Result<Value> {
+        let _lock = self.mutex.lock().unwrap();
         let gas_limit = U256::from(u32::max_value()).as_u64();
         let config = evm::Config::istanbul();
         let metadata = StackSubstateMetadata::new(gas_limit, &config);
@@ -92,26 +107,105 @@ impl DebugApiImpl {
             &precompile_set,
         );
         let access_list = Vec::new();
-        let (disable_storage, disable_memory, disable_stack) = params
-            .map(|p| {
-                (
-                    p.disable_storage.unwrap_or(false),
-                    p.disable_memory.unwrap_or(false),
-                    p.disable_stack.unwrap_or(false),
-                )
-            })
-            .unwrap_or((false, false, false));
 
-        let mut listener = DebugEventListener::new(disable_storage, disable_memory, disable_stack);
-        evm_runtime::tracing::using(&mut listener, || match to {
-            Some(t) => executor.transact_call(from, t, value, data, gas_limit, access_list),
-            None => executor.transact_create(from, value, data, gas_limit, access_list),
+        let params = params.unwrap_or(TraceParams {
+            disable_storage: None,
+            disable_memory: None,
+            disable_stack: None,
+            tracer: None,
+            timeout: None,
         });
-        Ok(TransactionTrace {
-            gas: U256::from(executor.used_gas()),
-            return_value: listener.return_value,
-            step_logs: listener.step_logs,
-        })
+        let (disable_storage, disable_memory, disable_stack) = {
+            (
+                params.disable_storage.unwrap_or(false),
+                params.disable_memory.unwrap_or(false),
+                params.disable_stack.unwrap_or(false),
+            )
+        };
+
+        let (contract_type, to_addr, input) = match to {
+            Some(addr) => (String::from("CALL"), addr, data.clone()),
+            None => (
+                String::from("CREATE"),
+                executor.create_address(Legacy { caller: from }),
+                data.clone(),
+            ),
+        };
+        let info = ContractInfo {
+            block,
+            block_hash,
+            tx_index,
+            tx_hash,
+            contract_type,
+            from,
+            to: to_addr,
+            gas: gas_limit.into(),
+            gas_price: self.gas_price.into(),
+            input,
+            value,
+        };
+        let funcs = parse_tracer(&params.tracer)?;
+        let mut listener = DebugEventListener::new(
+            disable_storage,
+            disable_memory,
+            disable_stack,
+            funcs,
+            info.clone(),
+            U256::from(height),
+        );
+
+        listener.func.as_ref().map(|val| {
+            let _ = val.call_setup_func(params).map_err(|e| {
+                log::error!(target: "debug api", "call_setup_func error:{}",e);
+            });
+        });
+
+        if let Some(ref func) = listener.func {
+            func.call_enter_func(
+                info.contract_type.as_str(),
+                info.from,
+                info.to,
+                info.input,
+                info.gas,
+                info.value,
+            )?;
+        }
+
+        let gas_used = U256::from(executor.used_gas());
+        let mut err = Default::default();
+        let mut output = Default::default();
+        evm_runtime::tracing::using(&mut listener, || {
+            let (exit_reason, ret_val) = match to {
+                Some(t) => executor.transact_call(from, t, value, data, gas_limit, access_list),
+                None => executor.transact_create(from, value, data, gas_limit, access_list),
+            };
+            match exit_reason {
+                ExitReason::Succeed(_) => err = None,
+                ExitReason::Error(e) => match e {
+                    ExitError::OutOfGas => err = Some("out of gas".to_string()),
+                    _ => err = Some(format!("evm error:{:?}", e)),
+                },
+                ExitReason::Revert(_) => {
+                    if ret_val.len() > 68 {
+                        let message_len = ret_val[36..68].iter().sum::<u8>();
+                        let body: &[u8] = &ret_val[68..68 + message_len as usize];
+                        if let Ok(reason) = std::str::from_utf8(body) {
+                            err = Some(format!(
+                                "VM Exception while processing transaction: revert {}",
+                                reason
+                            ));
+                        }
+                    }
+                }
+                ExitReason::Fatal(e) => err = Some(format!("evm fatal:{:?}", e)),
+            }
+            output = ret_val;
+        });
+        if let Some(ref func) = listener.func {
+            func.call_exit_func(gas_used, output.clone(), err)?;
+        }
+        let gas = U256::from(executor.used_gas());
+        listener.get_result(gas, time, output)
     }
 }
 
@@ -120,7 +214,7 @@ impl DebugApi for DebugApiImpl {
         &self,
         number: BlockNumber,
         params: Option<TraceParams>,
-    ) -> Result<Vec<TransactionTrace>> {
+    ) -> Result<Vec<Value>> {
         let mut conn = self.pool.get().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
@@ -158,7 +252,8 @@ impl DebugApi for DebugApiImpl {
         &self,
         block_hash: H256,
         params: Option<TraceParams>,
-    ) -> Result<Vec<TransactionTrace>> {
+    ) -> Result<Vec<Value>> {
+        log::info!(target: "debug api", "trace_transaction block_hash:{:?}  ", block_hash);
         let mut conn = self.pool.get().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
@@ -178,7 +273,15 @@ impl DebugApi for DebugApiImpl {
                 err
             })?;
         let mut traces = vec![];
-        for tx in block.transactions {
+        let time = DateTime::<UTC>::from_utc(
+            NaiveDateTime::from_timestamp_opt(block.header.timestamp as i64, 0).ok_or({
+                let mut err = Error::internal_error();
+                err.message = "timestamp out-of-range".to_string();
+                err
+            })?,
+            UTC,
+        );
+        for (index, tx) in block.transactions.iter().enumerate() {
             let (from, to, value, data) = match tx {
                 TransactionV2::Legacy(t) => (
                     recover_signer(&t).map_err(|e| {
@@ -191,7 +294,7 @@ impl DebugApi for DebugApiImpl {
                         TransactionAction::Create => None,
                     },
                     t.value,
-                    t.input,
+                    t.input.clone(),
                 ),
                 _ => {
                     let mut err = Error::internal_error();
@@ -206,8 +309,13 @@ impl DebugApi for DebugApiImpl {
                     to,
                     value,
                     data,
-                    block.header.number.as_u32(),
+                    block.header.number.as_u32() - 1,
                     params.clone(),
+                    time,
+                    block.header.number,
+                    block.header.hash(),
+                    index.into(),
+                    tx.hash(),
                 )
                 .map_err(|e| {
                     let mut err = Error::internal_error();
@@ -230,7 +338,8 @@ impl DebugApi for DebugApiImpl {
         request: CallRequest,
         number: BlockNumber,
         params: Option<TraceParams>,
-    ) -> Result<TransactionTrace> {
+    ) -> Result<Value> {
+        log::info!(target: "debug api", "trace_transaction number:{:?} request:{:?} ", number,request);
         let mut conn = self.pool.get().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
@@ -257,6 +366,11 @@ impl DebugApi for DebugApiImpl {
                 .into_vec(),
             height,
             params,
+            UTC::now(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
         )
         .map_err(|e| {
             let mut err = Error::internal_error();
@@ -265,11 +379,8 @@ impl DebugApi for DebugApiImpl {
         })
     }
 
-    fn trace_transaction(
-        &self,
-        tx_hash: H256,
-        params: Option<TraceParams>,
-    ) -> Result<TransactionTrace> {
+    fn trace_transaction(&self, tx_hash: H256, params: Option<TraceParams>) -> Result<Value> {
+        log::info!(target: "debug api", "trace_transaction tx_hash:{:?}", tx_hash);
         let mut conn = self.pool.get().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
@@ -300,6 +411,7 @@ impl DebugApi for DebugApiImpl {
                 err.message = "get_block_by_hash value is none".to_string();
                 err
             })?;
+
         let tx = block
             .transactions
             .get(index as usize)
@@ -310,8 +422,8 @@ impl DebugApi for DebugApiImpl {
             })
             .map(|tx| tx.clone())?;
 
-        let (from, to, value, data) = match tx {
-            TransactionV2::Legacy(t) => (
+        let (from, to, value, data, tx_hash) = match tx {
+            TransactionV2::Legacy(ref t) => (
                 recover_signer(&t).map_err(|e| {
                     let mut err = Error::internal_error();
                     err.message = format!("{:?}", e);
@@ -322,7 +434,8 @@ impl DebugApi for DebugApiImpl {
                     TransactionAction::Create => None,
                 },
                 t.value,
-                t.input,
+                t.input.clone(),
+                t.hash(),
             ),
             _ => {
                 let mut err = Error::internal_error();
@@ -331,11 +444,32 @@ impl DebugApi for DebugApiImpl {
             }
         };
 
-        self.trace_evm(from, to, value, data, block.header.number.as_u32(), params)
+        let ret = self
+            .trace_evm(
+                from,
+                to,
+                value,
+                data,
+                block.header.number.as_u32() - 1,
+                params,
+                DateTime::<UTC>::from_utc(
+                    NaiveDateTime::from_timestamp_opt(block.header.timestamp as i64, 0).ok_or({
+                        let mut err = Error::internal_error();
+                        err.message = "timestamp out-of-range".to_string();
+                        err
+                    })?,
+                    UTC,
+                ),
+                block.header.number,
+                block.header.hash(),
+                index.into(),
+                tx_hash,
+            )
             .map_err(|e| {
                 let mut err = Error::internal_error();
                 err.message = format!("{:?}", e);
                 err
-            })
+            });
+        ret
     }
 }
