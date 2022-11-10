@@ -1,4 +1,4 @@
-FROM docker.io/rust:slim AS builder
+FROM docker.io/rust:1.64.0-slim AS builder
 
 RUN apt-get update -y && apt-get install -y libssl-dev pkg-config make perl clang
 ENV OPENSSL_LIB_DIR="/usr/lib/x86_64-linux-gnu"
