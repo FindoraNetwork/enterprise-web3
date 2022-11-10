@@ -8,9 +8,11 @@ edition = "2021"
 [dependencies]
 primitive-types = "0.11.1"
 ethereum-types = "0.13.1"
-evm = { version = "0.35.0", default-features = false, features = ["with-serde"] }
+evm-runtime = { version = "*", default-features = false, features = ["tracing"] }
+evm = { version = "0.35.0", default-features = false, features = ["tracing", "with-serde"] }
 ethereum = { version = "0.12.0", default-features = false, features = ["with-serde"] }
 evm-exporter = { path = "../evm-exporter" }
+boa_engine = { version = "0.16.0", features = ["console", "deser", "intl", "profiler"]}
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -46,6 +48,7 @@ futures = { version = "0.3.16", features = ["compat", "thread-pool"] }
 toml = "0.5.8"
 parking_lot = "0.12"
 base64 = "0.12"
+chrono = "0.2.16"
 
 [features]
 default = []

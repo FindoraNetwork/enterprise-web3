@@ -1,3 +1,5 @@
+pub mod debug;
+pub mod debugapi;
 pub mod eth;
 pub mod eth_filter;
 pub mod eth_pubsub;
