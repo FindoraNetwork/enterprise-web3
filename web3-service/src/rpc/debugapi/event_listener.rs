@@ -99,26 +99,23 @@ impl DebugEventListener {
         }
         if let Some(ref func) = self.func {
             let value = func.call_result_func(
-                self.info.block_hash.clone(),
-                self.info.tx_index.clone(),
-                self.info.tx_hash.clone(),
+                self.info.block_hash,
+                self.info.tx_index,
+                self.info.tx_hash,
                 self.info.contract_type.clone(),
-                self.info.from.clone(),
-                self.info.to.clone(),
+                self.info.from,
+                self.info.to,
                 self.info.input.clone(),
-                self.info.gas.clone(),
-                self.info.gas_price.clone(),
-                self.info.value.clone(),
-                self.info.block.clone(),
-                self.info.gas_price.saturating_sub(gas_used.clone()),
+                self.info.gas,
+                self.info.gas_price,
+                self.info.value,
+                self.info.block,
+                self.info.gas_price.saturating_sub(gas_used),
                 self.return_value.clone(),
                 time,
                 gas_used,
-                self.error
-                    .borrow()
-                    .as_ref()
-                    .and_then(|val| Some(val.clone())),
-                self.height.clone(),
+                self.error.borrow().as_ref().cloned(),
+                self.height,
             );
             println!("value:{:?}", serde_json::to_string(&value).unwrap());
             return value;
@@ -126,7 +123,7 @@ impl DebugEventListener {
         serde_json::to_value(TransactionTrace {
             gas: gas_used,
             return_value: output,
-            step_logs: self.step_logs.iter().map(|val| val.clone()).collect(),
+            step_logs: self.step_logs.to_vec(),
         })
         .map_err(|_| {
             let mut err = Error::internal_error();
@@ -195,7 +192,7 @@ impl EventListener for DebugEventListener {
                             memory,
                             stack,
                         } = current_step;
-                        memory_data = memory.as_ref().and_then(|val| Some(val.clone()));
+                        memory_data = memory.as_ref().cloned();
                         let memory = memory.map(convert_memory);
 
                         let storage = if self.disable_storage {
@@ -219,10 +216,8 @@ impl EventListener for DebugEventListener {
                 match result {
                     Ok(_) => {
                         if let Some(ref func) = self.func {
-                            self.step_logs.last().map(|log| {
-                                let stack_data = log.stack.as_ref().and_then(|val| {
-                                    Some(val.iter().map(|val| val.clone()).collect::<Vec<H256>>())
-                                });
+                            if let Some(log) = self.step_logs.last() {
+                                let stack_data = log.stack.as_ref().map(|val| val.to_vec());
                                 if let Err(e) = func.call_step_func(
                                     log.pc.as_u64(),
                                     log.gas.as_u64(),
@@ -233,17 +228,17 @@ impl EventListener for DebugEventListener {
                                     Opcode(log.op),
                                     stack_data,
                                     memory_data,
-                                    self.info.from.clone(),
-                                    self.info.to.clone(),
-                                    self.info.value.clone(),
+                                    self.info.from,
+                                    self.info.to,
+                                    self.info.value,
                                     self.info.input.clone(),
-                                    self.height.clone(),
+                                    self.height,
                                 ) {
                                     if self.func_exec_result.is_none() {
                                         self.func_exec_result = Some(e);
                                     }
                                 };
-                            });
+                            };
                         }
                     }
                     Err(Capture::Exit(reason)) => {
@@ -280,38 +275,30 @@ impl EventListener for DebugEventListener {
                         }
                         if let Some(mut context) = self.context_stack.pop() {
                             if let Some(ref func) = self.func {
-                                self.step_logs.last().map(|log| {
-                                    let stack_data = log.stack.as_ref().and_then(|val| {
-                                        Some(
-                                            val.iter()
-                                                .map(|val| val.clone())
-                                                .collect::<Vec<H256>>(),
-                                        )
-                                    });
+                                if let Some(log) = self.step_logs.last() {
+                                    let stack_data = log.stack.as_ref().map(|val| val.to_vec());
+
                                     if let Err(e) = func.call_fault_func(
                                         log.pc.as_u64(),
                                         log.gas.as_u64(),
                                         log.gas_cost.as_u64(),
                                         log.depth.as_u64(),
                                         Default::default(),
-                                        self.error
-                                            .borrow()
-                                            .as_ref()
-                                            .and_then(|val| Some(val.clone())),
+                                        self.error.borrow().as_ref().cloned(),
                                         Opcode(log.op),
                                         stack_data,
                                         memory_data,
-                                        self.info.from.clone(),
-                                        self.info.to.clone(),
-                                        self.info.value.clone(),
+                                        self.info.from,
+                                        self.info.to,
+                                        self.info.value,
                                         self.info.input.clone(),
-                                        self.height.clone(),
+                                        self.height,
                                     ) {
                                         if self.func_exec_result.is_none() {
                                             self.func_exec_result = Some(e);
                                         }
                                     };
-                                });
+                                };
                             }
                             if self.context_stack.is_empty() {
                                 self.return_value = return_value.to_vec();

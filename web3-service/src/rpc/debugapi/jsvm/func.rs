@@ -20,6 +20,7 @@ pub struct Func {
     setup_func: Option<JsObject>,
 }
 impl Func {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         context: Context,
         this: JsValue,
@@ -114,7 +115,7 @@ impl Func {
         }
         Ok(())
     }
-
+    #[allow(clippy::too_many_arguments)]
     pub fn call_step_func(
         &self,
         pc: u64,
@@ -174,7 +175,7 @@ impl Func {
         }
         Ok(())
     }
-
+    #[allow(clippy::too_many_arguments)]
     pub fn call_fault_func(
         &self,
         pc: u64,
@@ -232,7 +233,7 @@ impl Func {
                 err
             })
     }
-
+    #[allow(clippy::too_many_arguments)]
     pub fn call_result_func(
         &self,
         block_hash: H256,
@@ -327,14 +328,14 @@ fn get_func(name: &str, js_obj: &JsObject, ctx: &mut Context) -> Result<Option<J
 fn to_hex(_value: &JsValue, params: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
     params
         .get(0)
-        .and_then(|v| Some(v.clone()))
-        .ok_or(JsValue::String(JsString::from("to_hex error")))
+        .cloned()
+        .ok_or_else(|| JsValue::String(JsString::from("to_hex error")))
 }
 
 fn bigint(_value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
     let num = params
         .get(0)
-        .ok_or(JsValue::String(JsString::from("bigint params is empty")))?
+        .ok_or_else(|| JsValue::String(JsString::from("bigint params is empty")))?
         .to_u32(ctx)?;
     Ok(JsValue::BigInt(JsBigInt::from(num)))
 }

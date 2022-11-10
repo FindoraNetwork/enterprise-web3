@@ -48,23 +48,13 @@ impl Cfg {
         )?;
         obj.set(
             "tracer",
-            self.params
-                .tracer
-                .as_ref()
-                .map(|val| val.clone())
-                .unwrap_or(String::new()),
+            self.params.tracer.as_ref().cloned().unwrap_or_default(),
             true,
             ctx,
         )?;
         obj.set(
             "timeout",
-            JsString::from(
-                self.params
-                    .timeout
-                    .as_ref()
-                    .map(|val| val.clone())
-                    .unwrap_or(String::new()),
-            ),
+            JsString::from(self.params.timeout.as_ref().cloned().unwrap_or_default()),
             true,
             ctx,
         )?;
@@ -101,37 +91,37 @@ impl Frame {
     fn get_type(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("contract_type", ctx)
     }
     fn get_from(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("from", ctx)
     }
     fn get_to(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("to", ctx)
     }
     fn get_input(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("input", ctx)
     }
     fn get_gas(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("gas", ctx)
     }
     fn get_value(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("value", ctx)
     }
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
@@ -237,21 +227,21 @@ impl FrameResult {
     fn get_gas_used(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("gas_used", ctx)
     }
 
     fn get_output(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("output", ctx)
     }
 
     fn get_error(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("err", ctx)
     }
 
@@ -317,17 +307,17 @@ impl Op {
     fn to_number(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("opcode", ctx)
     }
     fn to_string(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
-        let val = value.as_object().ok_or(JsValue::undefined())?;
+        let val = value.as_object().ok_or_else(JsValue::undefined)?;
         let opcode = Opcode(val.get("opcode", ctx)?.to_i32(ctx)? as u8);
 
         Ok(JsValue::String(JsString::from(Self::to_str(opcode))))
     }
     fn is_push(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
-        let val = value.as_object().ok_or(JsValue::undefined())?;
+        let val = value.as_object().ok_or_else(JsValue::undefined)?;
         let opcode = Opcode(val.get("opcode", ctx)?.to_i32(ctx)? as u8);
         Ok(JsValue::Boolean(opcode.is_push().is_some()))
     }
@@ -523,11 +513,11 @@ impl Stack {
     fn peek(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let index = params
             .get(0)
-            .ok_or(JsValue::String(JsString::from("peek params is empty")))?
+            .ok_or_else(|| JsValue::String(JsString::from("peek params is empty")))?
             .to_i32(ctx)?;
         value
             .as_object()
-            .ok_or(JsValue::String(JsString::from("peek value as_object")))?
+            .ok_or_else(|| JsValue::String(JsString::from("peek value as_object")))?
             .get(format!("data{}", index), ctx)
     }
     fn length(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
@@ -582,11 +572,11 @@ impl Memory {
     fn slice(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let start = params
             .get(0)
-            .ok_or(JsValue::String(JsString::from("slice params 0 is empty")))?
+            .ok_or_else(|| JsValue::String(JsString::from("slice params 0 is empty")))?
             .to_u32(ctx)? as usize;
         let mut end = params
             .get(1)
-            .ok_or(JsValue::String(JsString::from("slice params 1 is empty")))?
+            .ok_or_else(|| JsValue::String(JsString::from("slice params 1 is empty")))?
             .to_u32(ctx)? as usize;
 
         let length = value
@@ -602,7 +592,7 @@ impl Memory {
         }
         let data = value
             .as_object()
-            .ok_or(JsValue::String(JsString::from("slice value as_object")))?
+            .ok_or_else(|| JsValue::String(JsString::from("slice value as_object")))?
             .get("data", ctx)?
             .to_string(ctx)?
             .to_string();
@@ -610,29 +600,23 @@ impl Memory {
             .map_err(|_| JsValue::String(JsString::from("slice hex::decode(data) error")))?;
         let mut ret_data = vec![];
         for index in start..end {
-            data.get(index).map(|v| {
-                ret_data.push(v.clone());
-            });
+            if let Some(v) = data.get(index) {
+                ret_data.push(*v);
+            }
         }
         Ok(JsValue::String(JsString::from(hex::encode(&ret_data))))
     }
     fn get_uint(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let index = params
             .get(0)
-            .ok_or(JsValue::String(JsString::from(
-                "get_uint params 0 is empty",
-            )))?
+            .ok_or_else(|| JsValue::String(JsString::from("get_uint params 0 is empty")))?
             .to_u32(ctx)?;
         value
             .as_object()
-            .ok_or(JsValue::String(JsString::from(
-                "get_uint value as_object 1",
-            )))?
+            .ok_or_else(|| JsValue::String(JsString::from("get_uint value as_object 1")))?
             .get("data", ctx)?
             .as_object()
-            .ok_or(JsValue::String(JsString::from(
-                "get_uint value as_object 2",
-            )))?
+            .ok_or_else(|| JsValue::String(JsString::from("get_uint value as_object 2")))?
             .get(index as usize + 32, ctx)
     }
     fn length(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
@@ -701,25 +685,25 @@ impl Contract {
     fn get_caller(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("caller", ctx)
     }
     fn get_address(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("address", ctx)
     }
     fn get_value(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("value", ctx)
     }
     fn get_input(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("input", ctx)
     }
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
@@ -798,6 +782,7 @@ pub struct Log {
     contract: Contract,
 }
 impl Log {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         pc: u64,
         gas: u64,
@@ -821,45 +806,45 @@ impl Log {
             refund,
             err,
             op: Op::new(opcode),
-            stack: stack_data.and_then(|data| Some(Stack::new(data))),
-            memory: memory_data.and_then(|data| Some(Memory::new(data))),
+            stack: stack_data.map(Stack::new),
+            memory: memory_data.map(Memory::new),
             contract: Contract::new(caller, address, value, input),
         }
     }
     fn get_pc(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("pc", ctx)
     }
     fn get_gas(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("gas", ctx)
     }
     fn get_cost(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("cost", ctx)
     }
     fn get_depth(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("depth", ctx)
     }
     fn get_refund(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("refund", ctx)
     }
     fn get_error(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::undefined())?
+            .ok_or_else(JsValue::undefined)?
             .get("err", ctx)
     }
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
@@ -964,17 +949,13 @@ impl DB {
     fn get_balance(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let height = value
             .as_object()
-            .ok_or(JsValue::String(JsString::from(
-                "get_balance value.as_object()",
-            )))?
+            .ok_or_else(|| JsValue::String(JsString::from("get_balance value.as_object()")))?
             .get("height", ctx)?
             .to_u32(ctx)?;
         let address = H160::from_str(
             params
                 .get(0)
-                .ok_or(JsValue::String(JsString::from(
-                    "get_balance params is empty",
-                )))?
+                .ok_or_else(|| JsValue::String(JsString::from("get_balance params is empty")))?
                 .to_string(ctx)?
                 .as_str(),
         )
@@ -998,15 +979,13 @@ impl DB {
     fn get_nonce(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let height = value
             .as_object()
-            .ok_or(JsValue::String(JsString::from(
-                "get_nonce value.as_object()",
-            )))?
+            .ok_or_else(|| JsValue::String(JsString::from("get_nonce value.as_object()")))?
             .get("height", ctx)?
             .to_u32(ctx)?;
         let address = H160::from_str(
             params
                 .get(0)
-                .ok_or(JsValue::String(JsString::from("get_nonce params is empty")))?
+                .ok_or_else(|| JsValue::String(JsString::from("get_nonce params is empty")))?
                 .to_string(ctx)?
                 .as_str(),
         )
@@ -1030,15 +1009,13 @@ impl DB {
     fn get_code(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let height = value
             .as_object()
-            .ok_or(JsValue::String(JsString::from(
-                "get_code value.as_object()",
-            )))?
+            .ok_or_else(|| JsValue::String(JsString::from("get_code value.as_object()")))?
             .get("height", ctx)?
             .to_u32(ctx)?;
         let address = H160::from_str(
             params
                 .get(0)
-                .ok_or(JsValue::String(JsString::from("get_code params is empty")))?
+                .ok_or_else(|| JsValue::String(JsString::from("get_code params is empty")))?
                 .to_string(ctx)?
                 .as_str(),
         )
@@ -1053,7 +1030,7 @@ impl DB {
                         _ => vec![],
                     }
                 })
-                .unwrap_or(vec![]);
+                .unwrap_or_default();
             Ok(JsValue::String(JsString::from(format!(
                 "0x{}",
                 hex::encode(info)
@@ -1067,17 +1044,13 @@ impl DB {
     fn get_state(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let height = value
             .as_object()
-            .ok_or(JsValue::String(JsString::from(
-                "get_state value.as_object()",
-            )))?
+            .ok_or_else(|| JsValue::String(JsString::from("get_state value.as_object()")))?
             .get("height", ctx)?
             .to_u32(ctx)?;
         let address = H160::from_str(
             params
                 .get(0)
-                .ok_or(JsValue::String(JsString::from(
-                    "get_state params is empty 0",
-                )))?
+                .ok_or_else(|| JsValue::String(JsString::from("get_state params is empty 0")))?
                 .to_string(ctx)?
                 .as_str(),
         )
@@ -1085,9 +1058,7 @@ impl DB {
         let index = H256::from_str(
             params
                 .get(0)
-                .ok_or(JsValue::String(JsString::from(
-                    "get_state params is empty 1",
-                )))?
+                .ok_or_else(|| JsValue::String(JsString::from("get_state params is empty 1")))?
                 .to_string(ctx)?
                 .as_str(),
         )
@@ -1113,13 +1084,13 @@ impl DB {
     fn exists(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let height = value
             .as_object()
-            .ok_or(JsValue::String(JsString::from("exists value.as_object()")))?
+            .ok_or_else(|| JsValue::String(JsString::from("exists value.as_object()")))?
             .get("height", ctx)?
             .to_u32(ctx)?;
         let address = H160::from_str(
             params
                 .get(0)
-                .ok_or(JsValue::String(JsString::from("get_state params is empty")))?
+                .ok_or_else(|| JsValue::String(JsString::from("get_state params is empty")))?
                 .to_string(ctx)?
                 .as_str(),
         )
@@ -1211,6 +1182,7 @@ pub struct Ctx {
     error: Option<String>,
 }
 impl Ctx {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         block_hash: H256,
         tx_index: U256,

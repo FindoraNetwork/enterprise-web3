@@ -72,7 +72,7 @@ impl DebugApiImpl {
             mutex: Mutex::new(true),
         }
     }
-
+    #[allow(clippy::too_many_arguments)]
     fn trace_evm(
         &self,
         from: H160,
@@ -153,12 +153,11 @@ impl DebugApiImpl {
             info.clone(),
             U256::from(height),
         );
-
-        listener.func.as_ref().map(|val| {
+        if let Some(val) = listener.func.as_ref() {
             let _ = val.call_setup_func(params).map_err(|e| {
                 log::error!(target: "debug api", "call_setup_func error:{}",e);
             });
-        });
+        }
 
         if let Some(ref func) = listener.func {
             func.call_enter_func(
@@ -284,7 +283,7 @@ impl DebugApi for DebugApiImpl {
         for (index, tx) in block.transactions.iter().enumerate() {
             let (from, to, value, data) = match tx {
                 TransactionV2::Legacy(t) => (
-                    recover_signer(&t).map_err(|e| {
+                    recover_signer(t).map_err(|e| {
                         let mut err = Error::internal_error();
                         err.message = format!("{:?}", e);
                         err
@@ -424,7 +423,7 @@ impl DebugApi for DebugApiImpl {
 
         let (from, to, value, data, tx_hash) = match tx {
             TransactionV2::Legacy(ref t) => (
-                recover_signer(&t).map_err(|e| {
+                recover_signer(t).map_err(|e| {
                     let mut err = Error::internal_error();
                     err.message = format!("{:?}", e);
                     err
@@ -444,32 +443,30 @@ impl DebugApi for DebugApiImpl {
             }
         };
 
-        let ret = self
-            .trace_evm(
-                from,
-                to,
-                value,
-                data,
-                block.header.number.as_u32() - 1,
-                params,
-                DateTime::<UTC>::from_utc(
-                    NaiveDateTime::from_timestamp_opt(block.header.timestamp as i64, 0).ok_or({
-                        let mut err = Error::internal_error();
-                        err.message = "timestamp out-of-range".to_string();
-                        err
-                    })?,
-                    UTC,
-                ),
-                block.header.number,
-                block.header.hash(),
-                index.into(),
-                tx_hash,
-            )
-            .map_err(|e| {
-                let mut err = Error::internal_error();
-                err.message = format!("{:?}", e);
-                err
-            });
-        ret
+        self.trace_evm(
+            from,
+            to,
+            value,
+            data,
+            block.header.number.as_u32() - 1,
+            params,
+            DateTime::<UTC>::from_utc(
+                NaiveDateTime::from_timestamp_opt(block.header.timestamp as i64, 0).ok_or({
+                    let mut err = Error::internal_error();
+                    err.message = "timestamp out-of-range".to_string();
+                    err
+                })?,
+                UTC,
+            ),
+            block.header.number,
+            block.header.hash(),
+            index.into(),
+            tx_hash,
+        )
+        .map_err(|e| {
+            let mut err = Error::internal_error();
+            err.message = format!("{:?}", e);
+            err
+        })
     }
 }
