@@ -193,10 +193,15 @@ impl Frame {
             ctx,
         )?;
 
-        obj.set("gas", JsValue::Integer(self.gas.as_u32() as i32), true, ctx)?;
+        obj.set(
+            "gas",
+            JsValue::String(JsString::from(self.gas.to_string())),
+            true,
+            ctx,
+        )?;
         obj.set(
             "value",
-            JsValue::Integer(self.value.as_u32() as i32),
+            JsValue::String(JsString::from(self.value.to_string())),
             true,
             ctx,
         )?;
@@ -270,7 +275,7 @@ impl FrameResult {
         let obj = JsObject::default();
         obj.set(
             "gas_used",
-            JsValue::Integer(self.gas_used.as_u32() as i32),
+            JsValue::String(JsString::from(self.gas_used.to_string())),
             true,
             ctx,
         )?;
@@ -750,7 +755,7 @@ impl Contract {
         )?;
         obj.set(
             "value",
-            JsValue::Integer(self.value.as_u32() as i32),
+            JsValue::String(JsString::from(self.value.to_string())),
             true,
             ctx,
         )?;

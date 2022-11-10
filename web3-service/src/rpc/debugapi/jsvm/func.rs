@@ -1,7 +1,7 @@
 use {
     super::params::{Cfg, Ctx, Frame, FrameResult, Log, DB},
     crate::rpc::debugapi::types::TraceParams,
-    boa_engine::{prelude::JsObject, Context, JsBigInt, JsResult, JsString, JsValue},
+    boa_engine::{prelude::JsObject, Context, JsResult, JsString, JsValue},
     chrono::{DateTime, UTC},
     ethereum_types::{H160, H256, U256},
     evm::Opcode,
@@ -325,19 +325,11 @@ fn get_func(name: &str, js_obj: &JsObject, ctx: &mut Context) -> Result<Option<J
     Ok(func)
 }
 
-fn to_hex(_value: &JsValue, params: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
+fn js_func(_value: &JsValue, params: &[JsValue], _ctx: &mut Context) -> JsResult<JsValue> {
     params
         .get(0)
         .cloned()
-        .ok_or_else(|| JsValue::String(JsString::from("to_hex error")))
-}
-
-fn bigint(_value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
-    let num = params
-        .get(0)
-        .ok_or_else(|| JsValue::String(JsString::from("bigint params is empty")))?
-        .to_u32(ctx)?;
-    Ok(JsValue::BigInt(JsBigInt::from(num)))
+        .ok_or_else(|| JsValue::String(JsString::from("params is empty")))
 }
 
 pub fn parse_tracer(tracer: &Option<String>) -> Result<Option<Func>> {
@@ -350,9 +342,9 @@ pub fn parse_tracer(tracer: &Option<String>) -> Result<Option<Func>> {
     }
     let tracer = format!("({})", tracer);
     let mut ctx = Context::default();
-    ctx.register_global_function("toHex", 0, to_hex);
-    ctx.register_global_function("toAddress", 0, to_hex);
-    ctx.register_global_function("bigInt", 0, bigint);
+    ctx.register_global_function("toHex", 0, js_func);
+    ctx.register_global_function("toAddress", 0, js_func);
+    ctx.register_global_function("bigInt", 0, js_func);
     let value = ctx.eval(&tracer).map_err(|_| {
         let mut err = Error::internal_error();
         err.message = "javascript exec failed".to_owned();

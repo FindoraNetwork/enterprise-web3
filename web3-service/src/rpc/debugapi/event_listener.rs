@@ -98,7 +98,7 @@ impl DebugEventListener {
             return Err(err.clone());
         }
         if let Some(ref func) = self.func {
-            let value = func.call_result_func(
+            func.call_result_func(
                 self.info.block_hash,
                 self.info.tx_index,
                 self.info.tx_hash,
@@ -116,20 +116,19 @@ impl DebugEventListener {
                 gas_used,
                 self.error.borrow().as_ref().cloned(),
                 self.height,
-            );
-            println!("value:{:?}", serde_json::to_string(&value).unwrap());
-            return value;
+            )
+        } else {
+            serde_json::to_value(TransactionTrace {
+                gas: gas_used,
+                return_value: output,
+                step_logs: self.step_logs.to_vec(),
+            })
+            .map_err(|_| {
+                let mut err = Error::internal_error();
+                err.message = "serde_json::to_value error".to_owned();
+                err
+            })
         }
-        serde_json::to_value(TransactionTrace {
-            gas: gas_used,
-            return_value: output,
-            step_logs: self.step_logs.to_vec(),
-        })
-        .map_err(|_| {
-            let mut err = Error::internal_error();
-            err.message = "serde_json::to_value error".to_owned();
-            err
-        })
     }
 }
 

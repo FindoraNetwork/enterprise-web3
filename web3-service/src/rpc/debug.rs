@@ -87,7 +87,14 @@ impl DebugApiImpl {
         tx_index: U256,
         tx_hash: H256,
     ) -> Result<Value> {
-        let _lock = self.mutex.lock().unwrap();
+        let mut lock = self.mutex.try_lock();
+        loop {
+            if lock.is_ok() {
+                break;
+            } else {
+                lock = self.mutex.try_lock();
+            }
+        }
         let gas_limit = U256::from(u32::max_value()).as_u64();
         let config = evm::Config::istanbul();
         let metadata = StackSubstateMetadata::new(gas_limit, &config);
@@ -379,7 +386,6 @@ impl DebugApi for DebugApiImpl {
     }
 
     fn trace_transaction(&self, tx_hash: H256, params: Option<TraceParams>) -> Result<Value> {
-        log::info!(target: "debug api", "trace_transaction tx_hash:{:?}", tx_hash);
         let mut conn = self.pool.get().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
