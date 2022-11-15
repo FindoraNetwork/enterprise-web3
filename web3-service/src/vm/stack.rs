@@ -6,16 +6,15 @@ use {
         executor::stack::{Accessed, StackState, StackSubstateMetadata},
     },
     evm_exporter::{Getter, PREFIX},
+    jsonrpc_core::Value,
     ruc::{d, eg, RucResult},
     std::{
         borrow::Cow,
         collections::{BTreeMap, BTreeSet},
         mem::swap,
-        sync::{mpsc, Arc},
+        str::FromStr,
+        sync::Arc,
     },
-    tendermint_rpc::Client,
-    tendermint_rpc::HttpClient,
-    tokio::runtime::Runtime,
 };
 #[cfg(feature = "cluster_redis")]
 pub struct Web3EvmStackstate<'config> {
@@ -24,7 +23,7 @@ pub struct Web3EvmStackstate<'config> {
     height: u32,
     origin: H160,
     pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
-    tm_client: Arc<HttpClient>,
+    tendermint_url: String,
     metadata: StackSubstateMetadata<'config>,
     deletes: BTreeSet<H160>,
     parent: Option<Box<Self>>,
@@ -41,7 +40,7 @@ pub struct Web3EvmStackstate<'config> {
     is_pending: bool,
     origin: H160,
     pool: Arc<r2d2::Pool<redis::Client>>,
-    tm_client: Arc<HttpClient>,
+    tendermint_url: String,
     metadata: StackSubstateMetadata<'config>,
     deletes: BTreeSet<H160>,
     parent: Option<Box<Self>>,
@@ -60,7 +59,7 @@ impl<'config> Web3EvmStackstate<'config> {
         is_pending: bool,
         origin: H160,
         pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
-        tm_client: Arc<HttpClient>,
+        tendermint_url: &str,
         metadata: StackSubstateMetadata<'config>,
     ) -> Self {
         Self {
@@ -71,7 +70,7 @@ impl<'config> Web3EvmStackstate<'config> {
             origin,
             metadata,
             pool,
-            tm_client,
+            tendermint_url: tendermint_url.into(),
             deletes: BTreeSet::new(),
             parent: None,
             code: BTreeMap::new(),
@@ -89,7 +88,7 @@ impl<'config> Web3EvmStackstate<'config> {
         is_pending: bool,
         origin: H160,
         pool: Arc<r2d2::Pool<redis::Client>>,
-        tm_client: Arc<HttpClient>,
+        tendermint_url: &str,
         metadata: StackSubstateMetadata<'config>,
     ) -> Self {
         Self {
@@ -100,7 +99,7 @@ impl<'config> Web3EvmStackstate<'config> {
             origin,
             metadata,
             pool,
-            tm_client,
+            tendermint_url: tendermint_url.into(),
             deletes: BTreeSet::new(),
             parent: None,
             code: BTreeMap::new(),
@@ -153,18 +152,22 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
     fn block_coinbase(&self) -> H160 {
         let func = || -> ruc::Result<H160> {
-            let client = self.tm_client.clone();
-            let (tx, rx) = mpsc::channel();
-            let height = self.height;
-            Runtime::new().c(d!())?.spawn(async move {
-                let response = client.block(height).await;
-                let _ = tx.send(response);
-            });
-
-            rx.recv()
-                .c(d!())?
-                .map(|response| H160::from_slice(response.block.header.proposer_address.as_bytes()))
+            attohttpc::post(format!(
+                "{}/block?height={}",
+                self.tendermint_url, self.height
+            ))
+            .header(attohttpc::header::CONTENT_TYPE, "application/json")
+            .send()
+            .c(d!())
+            .and_then(|resp| resp.json::<Value>().c(d!()))
+            .and_then(|json_resp| {
+                H160::from_str(
+                    json_resp["result"]["block"]["header"]["proposer_address"]
+                        .as_str()
+                        .ok_or(eg!())?,
+                )
                 .c(d!())
+            })
         };
         func().unwrap_or_default()
     }
@@ -330,7 +333,7 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
             self.is_pending,
             self.origin,
             self.pool.clone(),
-            self.tm_client.clone(),
+            &self.tendermint_url,
             self.metadata.spit_child(gas_limit, is_static),
         );
         swap(&mut entering, self);

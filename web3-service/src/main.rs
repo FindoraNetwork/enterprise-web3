@@ -51,10 +51,16 @@ fn main() {
         config.gas_price,
         pool.clone(),
         tm_client.clone(),
+        config.tendermint_url.as_str(),
     );
     let net = NetApiImpl::new();
     let web3 = Web3ApiImpl::new();
-    let debug = DebugApiImpl::new(config.chain_id, config.gas_price, pool.clone(), tm_client);
+    let debug = DebugApiImpl::new(
+        config.chain_id,
+        config.gas_price,
+        pool.clone(),
+        config.tendermint_url.as_str(),
+    );
     let health = HealthApiImpl::new();
     let filter = EthFilterApiImpl::new(pool.clone());
     let subscriber_notify = Arc::new(SubscriberNotify::new(pool.clone(), &config.tendermint_url));
