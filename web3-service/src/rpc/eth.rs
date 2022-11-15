@@ -44,6 +44,7 @@ pub struct EthService {
     gas_price: u64,
     pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
     tm_client: Arc<HttpClient>,
+    tendermint_url: String,
 }
 #[cfg(not(feature = "cluster_redis"))]
 pub struct EthService {
@@ -51,6 +52,7 @@ pub struct EthService {
     gas_price: u64,
     pool: Arc<r2d2::Pool<redis::Client>>,
     tm_client: Arc<HttpClient>,
+    tendermint_url: String,
 }
 
 impl EthService {
@@ -60,12 +62,14 @@ impl EthService {
         gas_price: u64,
         pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
         tm_client: Arc<HttpClient>,
+        tendermint_url: &str,
     ) -> Self {
         Self {
             chain_id,
             gas_price,
             client,
             tm_client,
+            tendermint_url: tendermint_url.into(),
         }
     }
     #[cfg(not(feature = "cluster_redis"))]
@@ -74,12 +78,14 @@ impl EthService {
         gas_price: u64,
         pool: Arc<r2d2::Pool<redis::Client>>,
         tm_client: Arc<HttpClient>,
+        tendermint_url: &str,
     ) -> Self {
         Self {
             chain_id,
             gas_price,
             pool,
             tm_client,
+            tendermint_url: tendermint_url.into(),
         }
     }
 
@@ -341,7 +347,7 @@ impl EthApi for EthService {
                 is_pending,
                 request.from.unwrap_or_default(),
                 self.pool.clone(),
-                self.tm_client.clone(),
+                self.tendermint_url.as_str(),
                 metadata,
             ),
             &config,
@@ -1000,7 +1006,7 @@ impl EthApi for EthService {
                         is_pending,
                         request.from.unwrap_or_default(),
                         self.pool.clone(),
-                        self.tm_client.clone(),
+                        self.tendermint_url.as_str(),
                         metadata,
                     ),
                     &config,
