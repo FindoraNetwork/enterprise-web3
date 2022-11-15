@@ -2,8 +2,7 @@ FROM docker.io/rust:1.64.0-slim AS builder
 
 RUN apt-get update -y && apt-get install -y libssl-dev pkg-config make perl clang
 ENV OPENSSL_LIB_DIR="/usr/lib/x86_64-linux-gnu"
-ENV OPENSSL_INCLUDE_DIR="/usr/include/openssl"
-RUN rustup toolchain install nightly-2022-09-19
+ENV OPENSSL_INCLUDE_DIR="/usr/include/openssl" 
 COPY . /enterprise-web3
 WORKDIR /enterprise-web3
 RUN cargo build --release

@@ -23,7 +23,6 @@ use {
     evm_exporter::{utils::recover_signer, Getter, PREFIX},
     jsonrpc_core::{Error, Result, Value},
     std::sync::{Arc, Mutex},
-    tendermint_rpc::HttpClient,
     web3_rpc_core::types::{BlockNumber, CallRequest},
 };
 
@@ -32,15 +31,16 @@ pub struct DebugApiImpl {
     chain_id: u32,
     gas_price: u64,
     pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
-    tm_client: Arc<HttpClient>,
+    mutex: Mutex<bool>,
+    tendermint_url: String,
 }
 #[cfg(not(feature = "cluster_redis"))]
 pub struct DebugApiImpl {
     chain_id: u32,
     gas_price: u64,
     pool: Arc<r2d2::Pool<redis::Client>>,
-    tm_client: Arc<HttpClient>,
     mutex: Mutex<bool>,
+    tendermint_url: String,
 }
 impl DebugApiImpl {
     #[cfg(feature = "cluster_redis")]
@@ -48,13 +48,13 @@ impl DebugApiImpl {
         chain_id: u32,
         gas_price: u64,
         pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
-        tm_client: Arc<HttpClient>,
+        tendermint_url: &str,
     ) -> Self {
         Self {
             chain_id,
             gas_price,
             pool,
-            tm_client,
+            tendermint_url: tendermint_url.into(),
         }
     }
     #[cfg(not(feature = "cluster_redis"))]
@@ -62,14 +62,14 @@ impl DebugApiImpl {
         chain_id: u32,
         gas_price: u64,
         pool: Arc<r2d2::Pool<redis::Client>>,
-        tm_client: Arc<HttpClient>,
+        tendermint_url: &str,
     ) -> Self {
         Self {
             chain_id,
             gas_price,
             pool,
-            tm_client,
             mutex: Mutex::new(true),
+            tendermint_url: tendermint_url.into(),
         }
     }
     #[allow(clippy::too_many_arguments)]
@@ -107,7 +107,7 @@ impl DebugApiImpl {
                 false,
                 from,
                 self.pool.clone(),
-                self.tm_client.clone(),
+                self.tendermint_url.as_str(),
                 metadata,
             ),
             &config,
@@ -386,6 +386,7 @@ impl DebugApi for DebugApiImpl {
     }
 
     fn trace_transaction(&self, tx_hash: H256, params: Option<TraceParams>) -> Result<Value> {
+        log::warn!(target: "debug api", "trace_transaction tx_hash:{:?}", tx_hash);
         let mut conn = self.pool.get().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
