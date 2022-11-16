@@ -95,7 +95,7 @@ impl DebugApiImpl {
                 lock = self.mutex.try_lock();
             }
         }
-        let gas_limit = U256::from(u32::max_value()).as_u64();
+        let gas_limit = U256::from(i32::max_value()).as_u64();
         let config = evm::Config::istanbul();
         let metadata = StackSubstateMetadata::new(gas_limit, &config);
         let precompile_set = Web3EvmPrecompiles::default();
