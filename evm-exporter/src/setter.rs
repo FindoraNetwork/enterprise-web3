@@ -100,8 +100,9 @@ impl<C: ConnectionLike> Setter<C> {
         self.conn
             .set(status_key, serde_json::to_string(&statuses)?)?;
 
-        for (i, tx) in block.transactions.iter().enumerate() {
-            let transaction_index_key = keys::transaction_index_key(&self.prefix, tx.hash());
+        for (i, tx) in statuses.iter().enumerate() {
+            let transaction_index_key =
+                keys::transaction_index_key(&self.prefix, tx.transaction_hash);
             self.conn.set(
                 transaction_index_key,
                 serde_json::to_string(&(block_hash, i as u32))?,

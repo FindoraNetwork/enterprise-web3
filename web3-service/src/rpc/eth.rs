@@ -96,7 +96,7 @@ impl EthService {
     ) -> Transaction {
         if let TransactionV2::Legacy(tx) = transaction {
             Transaction {
-                hash: transaction.hash(),
+                hash: status.transaction_hash,
                 nonce: tx.nonce,
                 block_hash: Some(block.header.hash()),
                 block_number: Some(block.header.number),

@@ -278,6 +278,18 @@ impl DebugApi for DebugApiImpl {
                 err.message = "get_block_by_hash value is none".to_string();
                 err
             })?;
+        let transaction_statuses = getter
+            .get_transaction_status_by_block_hash(block_hash)
+            .map_err(|e| {
+                let mut err = Error::internal_error();
+                err.message = format!("{:?}", e);
+                err
+            })?
+            .ok_or({
+                let mut err = Error::internal_error();
+                err.message = "get_block_by_hash value is none".to_string();
+                err
+            })?;
         let mut traces = vec![];
         let time = DateTime::<UTC>::from_utc(
             NaiveDateTime::from_timestamp_opt(block.header.timestamp as i64, 0).ok_or({
@@ -321,7 +333,10 @@ impl DebugApi for DebugApiImpl {
                     block.header.number,
                     block.header.hash(),
                     index.into(),
-                    tx.hash(),
+                    transaction_statuses
+                        .get(index)
+                        .map(|status| status.transaction_hash)
+                        .unwrap_or(tx.hash()),
                 )
                 .map_err(|e| {
                     let mut err = Error::internal_error();
@@ -428,7 +443,7 @@ impl DebugApi for DebugApiImpl {
             })
             .map(|tx| tx.clone())?;
 
-        let (from, to, value, data, tx_hash) = match tx {
+        let (from, to, value, data) = match tx {
             TransactionV2::Legacy(ref t) => (
                 recover_signer(t).map_err(|e| {
                     let mut err = Error::internal_error();
@@ -441,7 +456,6 @@ impl DebugApi for DebugApiImpl {
                 },
                 t.value,
                 t.input.clone(),
-                t.hash(),
             ),
             _ => {
                 let mut err = Error::internal_error();
