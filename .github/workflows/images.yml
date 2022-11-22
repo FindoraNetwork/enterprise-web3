@@ -34,7 +34,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: 197320162446.dkr.ecr.us-west-2.amazonaws.com/enterprise-web3
+          images: 358484141435.dkr.ecr.us-west-2.amazonaws.com/enterprise-web3
           tags: |
             type=raw,value=fundation-{{branch}}-{{sha}}-{{date 'x'}}
             type=raw,value=latest
@@ -79,7 +79,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: 197320162446.dkr.ecr.us-west-2.amazonaws.com/enterprise-web3
+          images: 358484141435.dkr.ecr.us-west-2.amazonaws.com/enterprise-web3
           tags: |
             type=raw,value=rocksdb-exporter-{{branch}}-{{sha}}-{{date 'x'}}
 
@@ -121,7 +121,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: 197320162446.dkr.ecr.us-west-2.amazonaws.com/enterprise-web3
+          images: 358484141435.dkr.ecr.us-west-2.amazonaws.com/enterprise-web3
           tags: |
             type=raw,value=web3-service-{{branch}}-{{sha}}-{{date 'x'}}
 
