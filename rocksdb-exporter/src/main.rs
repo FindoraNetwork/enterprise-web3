@@ -20,21 +20,23 @@ fn main() {
     let hisdb = Arc::new(pnk!(RocksDB::open(config.history_db_path.as_str())));
 
     #[cfg(feature = "cluster_redis")]
-    let client = Arc::new(pnk!(redis::cluster::ClusterClient::open(
+    let client = pnk!(redis::cluster::ClusterClient::open(
         config.redis_url.clone()
-    )));
+    ));
     #[cfg(not(feature = "cluster_redis"))]
-    let client = Arc::new(pnk!(redis::Client::open(config.redis_url[0].as_ref())));
+    let client = pnk!(redis::Client::open(config.redis_url[0].as_ref()));
 
-    let mut setter = Setter::new(pnk!(client.get_connection()), PREFIX.to_string());
+    let pool = Arc::new(pnk!(r2d2::Pool::builder().max_size(50).build(client)));
+    let mut conn = pnk!(pool.get());
+    let mut setter = Setter::new(&mut *conn, PREFIX.to_string());
     let current_height = pnk!(get_current_height(&hisdb));
 
     let mut height = if config.clear {
         pnk!(setter.clear());
         U256::zero()
     } else {
-        let mut conn = pnk!(client.get_connection());
-        let mut getter = Getter::new(&mut conn, PREFIX.to_string());
+        let mut conn = pnk!(pool.get());
+        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
         U256::from(pnk!(getter.latest_height()))
     };
 
