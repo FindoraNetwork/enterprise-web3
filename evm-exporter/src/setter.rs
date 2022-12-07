@@ -12,18 +12,18 @@ use {
     redis_versioned_kv::VersionedKVCommand,
 };
 
-pub struct Setter<C> {
-    conn: C,
+pub struct Setter<'a, C> {
+    conn: &'a mut C,
     pub prefix: String,
 }
 
-impl<C: ConnectionLike> Setter<C> {
-    pub fn new(conn: C, prefix: String) -> Self {
+impl<'a, C: ConnectionLike> Setter<'a, C> {
+    pub fn new(conn: &'a mut C, prefix: String) -> Self {
         Self { conn, prefix }
     }
 
     pub fn clear(&mut self) -> Result<()> {
-        redis::cmd("FLUSHDB").arg("SYNC").query(&mut self.conn)?;
+        redis::cmd("FLUSHDB").arg("SYNC").query(self.conn)?;
         Ok(())
     }
 
