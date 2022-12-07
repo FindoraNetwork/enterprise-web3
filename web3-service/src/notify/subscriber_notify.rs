@@ -135,7 +135,7 @@ fn get_pending_hash(url: &str) -> Result<Vec<H256>> {
     if let Some(txs) = resp["result"]["txs"].as_array() {
         for tx in txs {
             if let Some(tx) = tx.as_str() {
-                base64::decode(&tx)
+                base64::decode(tx)
                     .map(|bytes| {
                         let hasher = sha2_256(&bytes);
                         pending_hash.push(H256::from_slice(&hasher))

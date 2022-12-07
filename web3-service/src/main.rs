@@ -50,7 +50,7 @@ fn main() {
         config.chain_id,
         config.gas_price,
         pool.clone(),
-        tm_client.clone(),
+        tm_client,
         config.tendermint_url.as_str(),
     );
     let net = NetApiImpl::new();

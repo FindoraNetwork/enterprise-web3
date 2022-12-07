@@ -20,7 +20,7 @@ use {
         CreateScheme::Legacy,
         ExitError, ExitReason,
     },
-    evm_exporter::{utils::recover_signer, Getter, PREFIX},
+    evm_exporter::{Getter, PREFIX},
     jsonrpc_core::{Error, Result, Value},
     std::sync::{Arc, Mutex},
     web3_rpc_core::types::{BlockNumber, CallRequest},
@@ -300,13 +300,18 @@ impl DebugApi for DebugApiImpl {
             UTC,
         );
         for (index, tx) in block.transactions.iter().enumerate() {
+            let status = transaction_statuses
+                .get(index as usize)
+                .ok_or({
+                    let mut err = Error::internal_error();
+                    err.message = "get transaction status value is none".to_string();
+                    err
+                })
+                .map(|status| status.clone())?;
+
             let (from, to, value, data) = match tx {
                 TransactionV2::Legacy(t) => (
-                    recover_signer(t).map_err(|e| {
-                        let mut err = Error::internal_error();
-                        err.message = format!("{:?}", e);
-                        err
-                    })?,
+                    status.from,
                     match t.action {
                         TransactionAction::Call(address) => Some(address),
                         TransactionAction::Create => None,
@@ -336,7 +341,7 @@ impl DebugApi for DebugApiImpl {
                     transaction_statuses
                         .get(index)
                         .map(|status| status.transaction_hash)
-                        .unwrap_or(tx.hash()),
+                        .unwrap_or_else(|| tx.hash()),
                 )
                 .map_err(|e| {
                     let mut err = Error::internal_error();
@@ -432,6 +437,26 @@ impl DebugApi for DebugApiImpl {
                 err.message = "get_block_by_hash value is none".to_string();
                 err
             })?;
+        let statuss = getter
+            .get_transaction_status_by_block_hash(block_hash)
+            .map_err(|e| {
+                let mut err = Error::internal_error();
+                err.message = format!("{:?}", e);
+                err
+            })?
+            .ok_or({
+                let mut err = Error::internal_error();
+                err.message = "get_transaction_status_by_block_hash value is none".to_string();
+                err
+            })?;
+        let status = statuss
+            .get(index as usize)
+            .ok_or({
+                let mut err = Error::internal_error();
+                err.message = "get transaction status value is none".to_string();
+                err
+            })
+            .map(|status| status.clone())?;
 
         let tx = block
             .transactions
@@ -445,11 +470,7 @@ impl DebugApi for DebugApiImpl {
 
         let (from, to, value, data) = match tx {
             TransactionV2::Legacy(ref t) => (
-                recover_signer(t).map_err(|e| {
-                    let mut err = Error::internal_error();
-                    err.message = format!("{:?}", e);
-                    err
-                })?,
+                status.from,
                 match t.action {
                     TransactionAction::Call(address) => Some(address),
                     TransactionAction::Create => None,

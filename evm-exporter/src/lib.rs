@@ -12,4 +12,5 @@ pub use getter::*;
 mod setter;
 pub use setter::*;
 
-pub mod utils;
+mod utils;
+pub use utils::*;

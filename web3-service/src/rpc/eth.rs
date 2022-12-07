@@ -14,7 +14,7 @@ use {
         executor::stack::{StackExecutor, StackSubstateMetadata},
         {ExitError, ExitReason},
     },
-    evm_exporter::{utils::public_key, Getter, TransactionStatus, PREFIX},
+    evm_exporter::{public_key, Getter, TransactionStatus, PREFIX},
     jsonrpc_core::{futures::future, BoxFuture, Error, ErrorCode, Result, Value},
     lazy_static::lazy_static,
     sha3::{Digest, Keccak256},
