@@ -406,7 +406,7 @@ impl DebugApi for DebugApiImpl {
     }
 
     fn trace_transaction(&self, tx_hash: H256, params: Option<TraceParams>) -> Result<Value> {
-        log::warn!(target: "debug api", "trace_transaction tx_hash:{:?}", tx_hash);
+        log::info!(target: "debug api", "trace_transaction tx_hash:{:?}", tx_hash);
         let mut conn = self.pool.get().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);

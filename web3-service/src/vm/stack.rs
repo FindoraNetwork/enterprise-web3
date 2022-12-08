@@ -336,6 +336,11 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
             &self.tendermint_url,
             self.metadata.spit_child(gas_limit, is_static),
         );
+        entering.deletes = self.deletes.clone();
+        entering.code = self.code.clone();
+        entering.storage = self.storage.clone();
+        entering.transfer_balance = self.transfer_balance.clone();
+        entering.logs = self.logs.clone();
         swap(&mut entering, self);
 
         self.parent = Some(Box::new(entering));
@@ -346,6 +351,11 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
             .parent
             .take()
             .ok_or_else(|| evm::ExitError::Other(Cow::from("Cannot commit on root substate")))?;
+        exited.deletes = self.deletes.clone();
+        exited.code = self.code.clone();
+        exited.storage = self.storage.clone();
+        exited.transfer_balance = self.transfer_balance.clone();
+        exited.logs = self.logs.clone();
         swap(&mut exited, self);
 
         self.metadata.swallow_commit(exited.metadata)?;
@@ -359,6 +369,11 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
             .parent
             .take()
             .ok_or_else(|| evm::ExitError::Other(Cow::from("Cannot revert on root substate")))?;
+        exited.deletes = self.deletes.clone();
+        exited.code = self.code.clone();
+        exited.storage = self.storage.clone();
+        exited.transfer_balance = self.transfer_balance.clone();
+        exited.logs = self.logs.clone();
         swap(&mut exited, self);
         self.metadata.swallow_revert(exited.metadata)?;
         Ok(())
@@ -369,6 +384,11 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
             .parent
             .take()
             .ok_or_else(|| evm::ExitError::Other(Cow::from("Cannot discard on root substate")))?;
+        exited.deletes = self.deletes.clone();
+        exited.code = self.code.clone();
+        exited.storage = self.storage.clone();
+        exited.transfer_balance = self.transfer_balance.clone();
+        exited.logs = self.logs.clone();
         swap(&mut exited, self);
         self.metadata.swallow_discard(exited.metadata)?;
         Ok(())
