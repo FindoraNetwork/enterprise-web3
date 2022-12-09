@@ -1,6 +1,6 @@
 use {
     crate::{
-        error::Result,
+        error::{Error, Result},
         keys,
         types::{Block, TransactionStatus},
         utils::recover_signer,
@@ -41,6 +41,12 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         Ok(())
     }
 
+    pub fn remove_balance(&mut self, height: u32, address: H160) -> Result<()> {
+        let balance_key = keys::balance_key(&self.prefix, address);
+        self.conn.vkv_del(balance_key, height)?;
+        Ok(())
+    }
+
     pub fn set_nonce(&mut self, height: u32, address: H160, nonce: U256) -> Result<()> {
         let nonce_key = keys::nonce_key(&self.prefix, address);
         self.conn
@@ -48,11 +54,20 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
 
         Ok(())
     }
-
+    pub fn remove_nonce(&mut self, height: u32, address: H160) -> Result<()> {
+        let nonce_key = keys::nonce_key(&self.prefix, address);
+        self.conn.vkv_del(nonce_key, height)?;
+        Ok(())
+    }
     pub fn set_byte_code(&mut self, height: u32, address: H160, code: Vec<u8>) -> Result<()> {
         let code_key = keys::code_key(&self.prefix, address);
         self.conn.vkv_set(code_key, height, hex::encode(&code))?;
 
+        Ok(())
+    }
+    pub fn remove_byte_code(&mut self, height: u32, address: H160) -> Result<()> {
+        let code_key = keys::code_key(&self.prefix, address);
+        self.conn.vkv_del(code_key, height)?;
         Ok(())
     }
 
@@ -69,6 +84,14 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         let state_addr_key = keys::state_addr_key(&self.prefix, address);
         self.conn
             .vkv_set(state_addr_key.clone(), height, state_addr_key)?;
+        Ok(())
+    }
+
+    pub fn remove_state(&mut self, height: u32, address: H160, index: H256) -> Result<()> {
+        let key = keys::state_key(&self.prefix, address, index);
+        self.conn.vkv_del(key, height)?;
+        let state_addr_key = keys::state_addr_key(&self.prefix, address);
+        self.conn.vkv_del(state_addr_key, height)?;
         Ok(())
     }
 
@@ -108,6 +131,43 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
                 serde_json::to_string(&(block_hash, i as u32))?,
             )?;
         }
+        Ok(())
+    }
+
+    pub fn remove_block_info(&mut self, height: U256) -> Result<()> {
+        let block_hash_key = keys::block_hash_key(&self.prefix, height);
+        let block_hash: H256 = match self
+            .conn
+            .get::<String, Option<String>>(block_hash_key.clone())?
+        {
+            Some(v) => serde_json::from_str(&v)?,
+            None => {
+                return Ok(());
+            }
+        };
+        let block_height_key = keys::block_height_key(&self.prefix, block_hash);
+        let block_key = keys::block_key(&self.prefix, block_hash);
+        let receipt_key = keys::receipt_key(&self.prefix, block_hash);
+        let status_key = keys::status_key(&self.prefix, block_hash);
+        let statuses: Vec<TransactionStatus> = match self
+            .conn
+            .get::<String, Option<String>>(status_key.clone())?
+        {
+            Some(v) => serde_json::from_str(&v)?,
+            None => {
+                return Err(Error::ValueNotFound);
+            }
+        };
+        for tx in statuses.iter() {
+            let transaction_index_key =
+                keys::transaction_index_key(&self.prefix, tx.transaction_hash);
+            self.conn.del(transaction_index_key)?;
+        }
+        self.conn.del(block_height_key)?;
+        self.conn.del(block_key)?;
+        self.conn.del(receipt_key)?;
+        self.conn.del(status_key)?;
+        self.conn.del(block_hash_key)?;
         Ok(())
     }
 

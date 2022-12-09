@@ -34,13 +34,21 @@ local function vkv_del(keys, args)
     local key = keys[1]
     local height = args[1]
 
-    local heighted_key = string.format("%s:%08X", key, height)
+    local res = redis.call('ZRANGE', key, height, '-inf', 'BYSCORE', 'REV', 'LIMIT', 0, 1)
+    if #res ~= 0 then
+        local value_key = res[1]
+        local value = redis.call('GET', value_key);
 
-    local value = args[2]
+        local val_keys = redis.call('ZRANGE', key, height, '-inf', 'BYSCORE', 'REV')
+        for i,val_key in pairs(val_keys) do
+            redis.call('ZREM', key, val_key);
+            redis.call('DEL', val_key)
+        end;
 
-    redis.call('ZADD', key, height, heighted_key)
-
-    redis.call('DEL', heighted_key)
+        local heighted_key = string.format("%s:%08X", key, height)
+        redis.call('ZADD', key, height, heighted_key)
+        redis.call('SET', heighted_key, value)
+    end
 end
 
 redis.register_function("vkv_set", vkv_set)
