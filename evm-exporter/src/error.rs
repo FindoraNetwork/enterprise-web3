@@ -14,6 +14,9 @@ pub enum Error {
     #[error("Slice length mismatch")]
     LengthMismatch,
 
+    #[error("Value not found")]
+    ValueNotFound,
+
     #[error(transparent)]
     SerdeJsonError(#[from] serde_json::Error),
 
