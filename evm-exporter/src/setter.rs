@@ -32,6 +32,11 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         self.conn.set(height_key, format!("{}", height))?;
         Ok(())
     }
+    pub fn set_lowest_height(&mut self, height: u32) -> Result<()> {
+        let height_key = keys::lowest_height_key(&self.prefix);
+        self.conn.set(height_key, format!("{}", height))?;
+        Ok(())
+    }
 
     pub fn set_balance(&mut self, height: u32, address: H160, balance: U256) -> Result<()> {
         let balance_key = keys::balance_key(&self.prefix, address);

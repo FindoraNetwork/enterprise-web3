@@ -30,7 +30,9 @@ pub fn state_key(prefix: &str, addr: H160, index: H256) -> String {
 pub fn latest_height_key(prefix: &str) -> String {
     format!("{}:height", prefix)
 }
-
+pub fn lowest_height_key(prefix: &str) -> String {
+    format!("{}:lowest_height", prefix)
+}
 pub fn tx_state_key(prefix: &str, tx_hash: H256) -> String {
     format!("{}:tx_state:hash.{}", prefix, hex::encode(tx_hash))
 }

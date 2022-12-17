@@ -23,7 +23,14 @@ impl<'a, C: ConnectionLike> Getter<'a, C> {
             _ => Ok(0),
         }
     }
-
+    pub fn lowest_height(&mut self) -> Result<u32> {
+        let height_key = keys::lowest_height_key(&self.prefix);
+        let height: Option<String> = self.conn.get(height_key)?;
+        match height {
+            Some(str) => Ok(str.parse::<u32>()?),
+            _ => Ok(0),
+        }
+    }
     pub fn get_balance(&mut self, height: u32, address: H160) -> Result<U256> {
         let balance_key = keys::balance_key(&self.prefix, address);
         let balance: Option<String> = self.conn.vkv_get(balance_key, height)?;
