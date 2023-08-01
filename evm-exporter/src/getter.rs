@@ -203,4 +203,26 @@ impl<'a, C: ConnectionLike> Getter<'a, C> {
         };
         Ok(val)
     }
+
+    pub fn get_total_issuance(&mut self, height: u32) -> Result<U256> {
+        let key = keys::total_issuance_key(&self.prefix);
+        let value: Option<String> = self.conn.vkv_get(key, height)?;
+        let val = if let Some(s) = value {
+            serde_json::from_str(s.as_str())?
+        } else {
+            U256::zero()
+        };
+        Ok(val)
+    }
+
+    pub fn get_allowances(&mut self, height: u32, owner: &[u8], spender: &[u8]) -> Result<U256> {
+        let key = keys::allowances_key(&self.prefix, owner, spender);
+        let value: Option<String> = self.conn.vkv_get(key, height)?;
+        let val = if let Some(s) = value {
+            serde_json::from_str(s.as_str())?
+        } else {
+            U256::zero()
+        };
+        Ok(val)
+    }
 }

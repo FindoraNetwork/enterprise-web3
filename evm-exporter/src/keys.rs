@@ -81,3 +81,15 @@ pub fn pending_state_key(prefix: &str, addr: H160, index: H256) -> String {
         hex::encode(index)
     )
 }
+
+pub fn allowances_key(prefix: &str, owner: &[u8], spender: &[u8]) -> String {
+    format!(
+        "{}:allowance:owner.{}:spender.{}",
+        prefix,
+        hex::encode(owner),
+        hex::encode(spender),
+    )
+}
+pub fn total_issuance_key(prefix: &str) -> String {
+    format!("{}:total_issuance", prefix)
+}
