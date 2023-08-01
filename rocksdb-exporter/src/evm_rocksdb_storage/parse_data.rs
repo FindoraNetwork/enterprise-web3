@@ -240,7 +240,7 @@ impl AccountAllowances {
         &self,
         is_decode_kv: bool,
         kv_pair: &(Box<[u8]>, Box<[u8]>),
-    ) -> Result<((Address32, Address32), U256)> {
+    ) -> Result<Option<((H160, H160), U256)>> {
         let (key, value) = if is_decode_kv {
             decode_kv(kv_pair)
         } else {
@@ -256,15 +256,22 @@ impl AccountAllowances {
         let key1 = *key_list.get(index + 1).c(d!())?;
         let key2 = *key_list.get(index + 2).c(d!())?;
 
-        let key1 = hex::decode(key1).c(d!())?;
-        let key2 = hex::decode(key2).c(d!())?;
+        let addr1 = Address32::from_str(key1).c(d!())?;
+        let addr2 = Address32::from_str(key2).c(d!())?;
 
-        let key1 = TryInto::<[u8; 32]>::try_into(key1).map_err(|_| d!())?;
-        let key2 = TryInto::<[u8; 32]>::try_into(key2).map_err(|_| d!())?;
-
-        Ok((
-            (Address32(key1), Address32(key2)),
-            serde_json::from_slice(&value).c(d!())?,
-        ))
+        let ret = if String::from_utf8_lossy(addr1.as_ref()).starts_with("evm:")
+            && String::from_utf8_lossy(addr2.as_ref()).starts_with("evm:")
+        {
+            Some((
+                (
+                    H160::from_slice(&addr1.as_ref()[4..24]),
+                    H160::from_slice(&addr2.as_ref()[4..24]),
+                ),
+                serde_json::from_slice(&value).c(d!())?,
+            ))
+        } else {
+            None
+        };
+        Ok(ret)
     }
 }

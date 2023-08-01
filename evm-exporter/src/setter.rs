@@ -261,8 +261,8 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
     pub fn set_allowances(
         &mut self,
         height: u32,
-        owner: &[u8],
-        spender: &[u8],
+        owner: H160,
+        spender: H160,
         value: U256,
     ) -> Result<()> {
         let key = keys::allowances_key(&self.prefix, owner, spender);

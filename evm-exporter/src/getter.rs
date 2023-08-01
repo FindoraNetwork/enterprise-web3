@@ -215,7 +215,7 @@ impl<'a, C: ConnectionLike> Getter<'a, C> {
         Ok(val)
     }
 
-    pub fn get_allowances(&mut self, height: u32, owner: &[u8], spender: &[u8]) -> Result<U256> {
+    pub fn get_allowances(&mut self, height: u32, owner: H160, spender: H160) -> Result<U256> {
         let key = keys::allowances_key(&self.prefix, owner, spender);
         let value: Option<String> = self.conn.vkv_get(key, height)?;
         let val = if let Some(s) = value {

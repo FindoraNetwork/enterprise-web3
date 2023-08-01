@@ -81,7 +81,7 @@ fn main() {
         }
 
         for ((owner, spender), value) in allowances {
-            pnk!(setter.set_allowances(h, &owner.0, &spender.0, value));
+            pnk!(setter.set_allowances(h, owner, spender, value));
         }
         pnk!(setter.set_total_issuance(h, total_issuance));
 

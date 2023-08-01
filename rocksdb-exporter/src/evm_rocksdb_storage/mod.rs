@@ -139,7 +139,7 @@ pub fn get_account_info(
     Vec<(H160, (U256, U256))>,
     Vec<(H160, Vec<u8>)>,
     Vec<((H160, H256), H256)>,
-    Vec<((Address32, Address32), U256)>,
+    Vec<((H160, H160), U256)>,
     U256,
 )> {
     let (cf_name, is_decode_kv) = if 0 == height {
@@ -180,7 +180,9 @@ pub fn get_account_info(
     {
         let allowances_storage = AccountAllowances::new(state_db);
         for kv_pair in allowances_storage.get_all(cf_name, true, height)? {
-            allowances.push(allowances_storage.parse_data(is_decode_kv, &kv_pair)?)
+            if let Some(data) = allowances_storage.parse_data(is_decode_kv, &kv_pair)? {
+                allowances.push(data);
+            }
         }
     }
     let total_issuance_storage = AccountTotalIssuance::new(state_db);

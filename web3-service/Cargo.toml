@@ -60,6 +60,8 @@ slices = "0.2.0"
 noah-algebra  = { git = "https://github.com/FindoraNetwork/noah", tag = "v0.4.3-1" }
 noah-crypto  = { git = "https://github.com/FindoraNetwork/noah", tag = "v0.4.3-1" }
 
+precompile-utils-macro = { path = "src/vm/precompile/frc20/macro" }
+
 [features]
 default = []
 cluster_redis = ["redis/cluster"]

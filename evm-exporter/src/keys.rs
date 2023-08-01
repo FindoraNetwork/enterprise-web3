@@ -82,7 +82,7 @@ pub fn pending_state_key(prefix: &str, addr: H160, index: H256) -> String {
     )
 }
 
-pub fn allowances_key(prefix: &str, owner: &[u8], spender: &[u8]) -> String {
+pub fn allowances_key(prefix: &str, owner: H160, spender: H160) -> String {
     format!(
         "{}:allowance:owner.{}:spender.{}",
         prefix,

@@ -1,7 +1,10 @@
+use std::cell::RefCell;
+
 mod anemoi;
 mod blake2f;
 mod bn128;
 mod ecrecover;
+mod frc20;
 mod identity;
 mod modexp;
 mod ripemd160_precompile;
@@ -15,14 +18,20 @@ use {
     ethereum_types::H160,
     evm::executor::stack::{PrecompileFailure, PrecompileFn, PrecompileOutput, PrecompileSet},
     evm_runtime::{Context, ExitError},
+    frc20::FRC20,
     identity::Identity,
     modexp::Modexp,
-    once_cell::sync::Lazy,
+    once_cell::sync::{Lazy, OnceCell},
+    r2d2::Pool,
     ripemd160_precompile::Ripemd160,
     ruc::*,
     sha256::Sha256,
-    std::collections::BTreeMap,
+    std::{collections::BTreeMap, sync::Arc},
 };
+#[cfg(feature = "cluster_redis")]
+pub static REDIS_POOL: OnceCell<Arc<Pool<redis::cluster::ClusterClient>>> = OnceCell::new();
+#[cfg(not(feature = "cluster_redis"))]
+pub static REDIS_POOL: OnceCell<Arc<Pool<redis::Client>>> = OnceCell::new();
 
 pub type PrecompileResult = core::result::Result<PrecompileOutput, PrecompileFailure>;
 
@@ -39,7 +48,6 @@ pub(crate) static PRECOMPILE_SET: Lazy<BTreeMap<H160, PrecompileFn>> = Lazy::new
         idx_to_h160(9) => Blake2F::execute,
         // idx_to_h160(0x1000) => FRC20::execute,
         idx_to_h160(0x2002) => Anemoi::execute,
-
     }
 });
 
@@ -48,8 +56,16 @@ pub(crate) fn idx_to_h160(i: u64) -> H160 {
     H160::from_low_u64_be(i)
 }
 
-#[derive(Default)]
-pub struct Web3EvmPrecompiles;
+pub struct Web3EvmPrecompiles {
+    frc20: RefCell<FRC20>,
+}
+impl Web3EvmPrecompiles {
+    pub fn new(height: u32) -> Self {
+        Web3EvmPrecompiles {
+            frc20: RefCell::new(FRC20::new(height)),
+        }
+    }
+}
 
 impl PrecompileSet for Web3EvmPrecompiles {
     fn execute(
@@ -60,9 +76,17 @@ impl PrecompileSet for Web3EvmPrecompiles {
         context: &Context,
         is_static: bool,
     ) -> Option<core::result::Result<PrecompileOutput, PrecompileFailure>> {
-        PRECOMPILE_SET
-            .get(&address)
-            .map(|f| f(input, target_gas, context, is_static))
+        if address == H160::from_low_u64_be(FRC20::contract_id()) {
+            Some(
+                self.frc20
+                    .borrow_mut()
+                    .execute(input, target_gas, context, is_static),
+            )
+        } else {
+            PRECOMPILE_SET
+                .get(&address)
+                .map(|f| f(input, target_gas, context, is_static))
+        }
     }
 
     fn is_precompile(&self, address: H160) -> bool {
