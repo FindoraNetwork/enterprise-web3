@@ -304,7 +304,7 @@ impl DebugApi for DebugApiImpl {
         );
         for (index, tx) in block.transactions.iter().enumerate() {
             let status = transaction_statuses
-                .get(index as usize)
+                .get(index)
                 .ok_or({
                     let mut err = Error::internal_error();
                     err.message = "get transaction status value is none".to_string();

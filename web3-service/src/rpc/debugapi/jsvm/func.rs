@@ -293,7 +293,7 @@ impl<'a> Func<'a> {
                 &[JsValue::Object(ctx), JsValue::Object(db)],
                 context,
             )
-            .map_err(|e| {
+            .map_err(|_| {
                 let mut err = Error::internal_error();
                 err.message = "call result function error".to_owned();
                 err
@@ -342,9 +342,24 @@ pub fn parse_tracer<'a>(mut ctx: Context<'a>, tracer: &Option<String>) -> Result
 
     let func = NativeFunction::from_fn_ptr(js_func);
 
-    ctx.register_global_callable("toHex", 0, func.clone());
-    ctx.register_global_callable("toAddress", 0, func.clone());
-    ctx.register_global_callable("bigInt", 0, func);
+    ctx.register_global_callable("toHex", 0, func.clone())
+        .map_err(|e| {
+            let mut err = Error::internal_error();
+            err.message = format!("javascript exec failed:{:?}", e);
+            err
+        })?;
+    ctx.register_global_callable("toAddress", 0, func.clone())
+        .map_err(|e| {
+            let mut err = Error::internal_error();
+            err.message = format!("javascript exec failed:{:?}", e);
+            err
+        })?;
+    ctx.register_global_callable("bigInt", 0, func)
+        .map_err(|e| {
+            let mut err = Error::internal_error();
+            err.message = format!("javascript exec failed:{:?}", e);
+            err
+        })?;
     let value = ctx.eval(Source::from_bytes(&tracer)).map_err(|_| {
         let mut err = Error::internal_error();
         err.message = "javascript exec failed".to_owned();

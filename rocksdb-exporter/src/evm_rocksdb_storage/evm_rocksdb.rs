@@ -16,7 +16,7 @@ impl RocksDB {
     pub fn open(path: &str) -> Result<Self> {
         let opts = Self::default_db_opts();
         let cf_names = DB::list_cf(&opts, path).c(d!())?;
-        let db = DB::open_cf_for_read_only(&opts, path, &cf_names, false).c(d!())?;
+        let db = DB::open_cf_for_read_only(&opts, path, cf_names, false).c(d!())?;
         Ok(Self { db })
     }
     pub fn iterate(

@@ -74,7 +74,7 @@ impl Bn128Add {
 
     pub fn execute(
         input: &[u8],
-        gas_limit: Option<u64>,
+        _gas_limit: Option<u64>,
         _context: &Context,
         _is_static: bool,
     ) -> PrecompileResult {
@@ -119,7 +119,7 @@ impl Bn128Mul {
 
     pub fn execute(
         input: &[u8],
-        gas_limit: Option<u64>,
+        _gas_limit: Option<u64>,
         _context: &Context,
         _is_static: bool,
     ) -> PrecompileResult {

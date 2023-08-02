@@ -161,7 +161,7 @@ impl EventListener for DebugEventListener<'_> {
                         depth,
                         gas: 0,
                         gas_cost: 0,
-                        position: *position.as_ref().unwrap_or(&0) as usize,
+                        position: *position.as_ref().unwrap_or(&0),
                         memory: if self.disable_memory {
                             None
                         } else {

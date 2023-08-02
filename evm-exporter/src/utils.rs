@@ -13,8 +13,7 @@ pub fn public_key(tx: &LegacyTransaction) -> Result<[u8; 64]> {
     sig[64] = tx.signature.standard_v();
     msg.copy_from_slice(&LegacyTransactionMessage::from(tx.clone()).hash()[..]);
     let rs = libsecp256k1::Signature::parse_standard_slice(&sig[0..64])?;
-    let v =
-        libsecp256k1::RecoveryId::parse(if sig[64] > 26 { sig[64] - 27 } else { sig[64] } as u8)?;
+    let v = libsecp256k1::RecoveryId::parse(if sig[64] > 26 { sig[64] - 27 } else { sig[64] })?;
     let pubkey = libsecp256k1::recover(&libsecp256k1::Message::parse(&msg), &rs, &v)?;
     let mut res = [0u8; 64];
     res.copy_from_slice(&pubkey.serialize()[1..65]);

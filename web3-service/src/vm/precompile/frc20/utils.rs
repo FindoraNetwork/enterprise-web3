@@ -50,48 +50,6 @@ impl LogsBuilder {
         self.logs
     }
 
-    /// Add a 0-topic log.
-    pub fn log0<D>(mut self, data: D) -> Self
-    where
-        D: Into<Vec<u8>>,
-    {
-        self.logs.push(Log {
-            address: self.address,
-            data: data.into(),
-            topics: vec![],
-        });
-        self
-    }
-
-    /// Add a 1-topic log.
-    pub fn log1<D, T0>(mut self, topic0: T0, data: D) -> Self
-    where
-        D: Into<Vec<u8>>,
-        T0: Into<H256>,
-    {
-        self.logs.push(Log {
-            address: self.address,
-            data: data.into(),
-            topics: vec![topic0.into()],
-        });
-        self
-    }
-
-    /// Add a 2-topics log.
-    pub fn log2<D, T0, T1>(mut self, topic0: T0, topic1: T1, data: D) -> Self
-    where
-        D: Into<Vec<u8>>,
-        T0: Into<H256>,
-        T1: Into<H256>,
-    {
-        self.logs.push(Log {
-            address: self.address,
-            data: data.into(),
-            topics: vec![topic0.into(), topic1.into()],
-        });
-        self
-    }
-
     /// Add a 3-topics log.
     pub fn log3<D, T0, T1, T2>(mut self, topic0: T0, topic1: T1, topic2: T2, data: D) -> Self
     where
@@ -104,30 +62,6 @@ impl LogsBuilder {
             address: self.address,
             data: data.into(),
             topics: vec![topic0.into(), topic1.into(), topic2.into()],
-        });
-        self
-    }
-
-    /// Add a 4-topics log.
-    pub fn log4<D, T0, T1, T2, T3>(
-        mut self,
-        topic0: T0,
-        topic1: T1,
-        topic2: T2,
-        topic3: T3,
-        data: D,
-    ) -> Self
-    where
-        D: Into<Vec<u8>>,
-        T0: Into<H256>,
-        T1: Into<H256>,
-        T2: Into<H256>,
-        T3: Into<H256>,
-    {
-        self.logs.push(Log {
-            address: self.address,
-            data: data.into(),
-            topics: vec![topic0.into(), topic1.into(), topic2.into(), topic3.into()],
         });
         self
     }
@@ -190,28 +124,5 @@ impl Gasometer {
         self.record_cost(data_cost)?;
 
         Ok(())
-    }
-
-    /// Record cost of logs.
-    pub fn record_log_costs(&mut self, logs: &[Log]) -> EvmResult {
-        for log in logs {
-            self.record_log_costs_manual(log.topics.len(), log.data.len())?;
-        }
-
-        Ok(())
-    }
-
-    /// Compute remaining gas.
-    /// Returns error if out of gas.
-    /// Returns None if no gas limit.
-    pub fn remaining_gas(&self) -> EvmResult<Option<u64>> {
-        Ok(match self.target_gas {
-            None => None,
-            Some(gas_limit) => Some(
-                gas_limit
-                    .checked_sub(self.used_gas)
-                    .ok_or(ExitError::OutOfGas)?,
-            ),
-        })
     }
 }

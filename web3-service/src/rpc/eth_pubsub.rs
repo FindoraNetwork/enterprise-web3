@@ -219,8 +219,7 @@ pub fn logs(block: Block, receipts: Vec<Receipt>, params: &FilteredParams) -> Ve
     for (receipt_index, receipt) in receipts.into_iter().enumerate() {
         let transaction_hash: Option<H256> = if !get_logs(receipt.clone()).is_empty() {
             Some(H256::from_slice(
-                Keccak256::digest(&rlp::encode(&block.transactions[receipt_index as usize]))
-                    .as_slice(),
+                Keccak256::digest(&rlp::encode(&block.transactions[receipt_index])).as_slice(),
             ))
         } else {
             None

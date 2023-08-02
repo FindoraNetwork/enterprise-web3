@@ -66,7 +66,7 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
     }
     pub fn set_byte_code(&mut self, height: u32, address: H160, code: Vec<u8>) -> Result<()> {
         let code_key = keys::code_key(&self.prefix, address);
-        self.conn.vkv_set(code_key, height, hex::encode(&code))?;
+        self.conn.vkv_set(code_key, height, hex::encode(code))?;
 
         Ok(())
     }
@@ -254,7 +254,7 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
     pub fn set_total_issuance(&mut self, height: u32, value: U256) -> Result<()> {
         let key = keys::total_issuance_key(&self.prefix);
         self.conn
-            .vkv_set(key.clone(), height, serde_json::to_string(&value)?)?;
+            .vkv_set(key, height, serde_json::to_string(&value)?)?;
         Ok(())
     }
 
@@ -267,7 +267,7 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
     ) -> Result<()> {
         let key = keys::allowances_key(&self.prefix, owner, spender);
         self.conn
-            .vkv_set(key.clone(), height, serde_json::to_string(&value)?)?;
+            .vkv_set(key, height, serde_json::to_string(&value)?)?;
         Ok(())
     }
 }

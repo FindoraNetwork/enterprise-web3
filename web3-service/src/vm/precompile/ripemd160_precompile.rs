@@ -38,7 +38,7 @@ impl Ripemd160 {
 
         let mut ret = [0u8; 32];
         let data = ripemd160::Ripemd160::digest(input);
-        ret[12..32].copy_from_slice(&data.as_slice());
+        ret[12..32].copy_from_slice(data.as_slice());
 
         let cost = ensure_linear_cost(gas_limit, input.len() as u64, Self::BASE, Self::WORD)?;
 
