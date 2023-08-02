@@ -45,7 +45,7 @@ pub struct ContractInfo {
     pub input: Vec<u8>,
     pub value: U256,
 }
-pub struct DebugEventListener {
+pub struct DebugEventListener<'a> {
     disable_storage: bool,
     disable_memory: bool,
     disable_stack: bool,
@@ -55,18 +55,18 @@ pub struct DebugEventListener {
 
     step_logs: Vec<RawStepLog>,
     return_value: Vec<u8>,
-    pub func: Option<Func>,
+    pub func: Option<Func<'a>>,
     func_exec_result: Option<Error>,
     error: RefCell<Option<String>>,
     info: ContractInfo,
     height: U256,
 }
-impl DebugEventListener {
+impl<'a> DebugEventListener<'a> {
     pub fn new(
         disable_storage: bool,
         disable_memory: bool,
         disable_stack: bool,
-        func: Option<Func>,
+        func: Option<Func<'a>>,
         info: ContractInfo,
         height: U256,
     ) -> Self {
@@ -132,7 +132,7 @@ impl DebugEventListener {
     }
 }
 
-impl EventListener for DebugEventListener {
+impl EventListener for DebugEventListener<'_> {
     fn event(&mut self, event: RuntimeEvent) {
         match event {
             RuntimeEvent::Step {

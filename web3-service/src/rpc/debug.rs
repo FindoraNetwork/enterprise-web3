@@ -1,3 +1,5 @@
+use boa_engine::Context;
+
 use {
     super::{
         debugapi::{
@@ -98,7 +100,7 @@ impl DebugApiImpl {
         let gas_limit = U256::from(i32::max_value()).as_u64();
         let config = evm::Config::istanbul();
         let metadata = StackSubstateMetadata::new(gas_limit, &config);
-        let precompile_set = Web3EvmPrecompiles::default();
+        let precompile_set = Web3EvmPrecompiles::new(height);
         let mut executor = StackExecutor::new_with_precompiles(
             Web3EvmStackstate::new(
                 U256::from(self.gas_price),
@@ -151,7 +153,8 @@ impl DebugApiImpl {
             input,
             value,
         };
-        let funcs = parse_tracer(&params.tracer)?;
+        let ctx = Context::default();
+        let funcs = parse_tracer(ctx, &params.tracer)?;
         let mut listener = DebugEventListener::new(
             disable_storage,
             disable_memory,
