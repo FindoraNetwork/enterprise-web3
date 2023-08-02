@@ -1,5 +1,7 @@
 # Enterprise Web3 Service
-
+```
+cat  redis-versioned-kv/lua/versioned-kv.lua | redis-cli -h 127.0.0.1 -p 6379 -x FUNCTION LOAD REPLACE
+```
 ## Design
 
 - Redis as store backend

@@ -1,3 +1,5 @@
+use crate::vm::precompile::REDIS_POOL;
+
 mod config;
 mod notify;
 mod rpc;
@@ -44,6 +46,8 @@ fn main() {
     #[cfg(not(feature = "cluster_redis"))]
     let client = pnk!(redis::Client::open(config.redis_url[0].as_ref()));
     let pool = Arc::new(pnk!(r2d2::Pool::builder().max_size(50).build(client)));
+    REDIS_POOL.set(pool.clone()).expect("REDIS_POOL set error");
+
     pnk!(init_upstream(pool.clone()));
     let tm_client = Arc::new(pnk!(HttpClient::new(config.tendermint_url.as_str())));
     let eth = EthService::new(

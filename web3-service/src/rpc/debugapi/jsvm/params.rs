@@ -1,8 +1,8 @@
 use {
     crate::rpc::debugapi::types::TraceParams,
     boa_engine::{
-        builtins::function::Function, object::ObjectData, prelude::JsObject, Context, JsResult,
-        JsString, JsValue,
+        object::FunctionObjectBuilder, prelude::JsObject, Context, JsError, JsResult, JsString,
+        JsValue, NativeFunction,
     },
     chrono::{DateTime, UTC},
     ethereum_types::{H160, H256, U256},
@@ -91,82 +91,58 @@ impl Frame {
     fn get_type(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("contract_type", ctx)
     }
     fn get_from(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("from", ctx)
     }
     fn get_to(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("to", ctx)
     }
     fn get_input(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("input", ctx)
     }
     fn get_gas(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("gas", ctx)
     }
     fn get_value(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("value", ctx)
     }
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
-        let get_type = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_type,
-                constructor: None,
-            }),
-        );
-        let get_from = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_from,
-                constructor: None,
-            }),
-        );
-        let get_to = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_to,
-                constructor: None,
-            }),
-        );
-        let get_input = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_input,
-                constructor: None,
-            }),
-        );
-        let get_gas = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_gas,
-                constructor: None,
-            }),
-        );
-        let get_value = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_value,
-                constructor: None,
-            }),
-        );
+        let get_type =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_type)).build();
+
+        let get_from =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_from)).build();
+
+        let get_to =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_to)).build();
+
+        let get_input =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_input)).build();
+
+        let get_gas =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_gas)).build();
+
+        let get_value =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_value)).build();
+
         let obj = JsObject::default();
         obj.set(
             "contract_type",
@@ -232,46 +208,35 @@ impl FrameResult {
     fn get_gas_used(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("gas_used", ctx)
     }
 
     fn get_output(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("output", ctx)
     }
 
     fn get_error(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("err", ctx)
     }
 
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
-        let get_gas_used = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_gas_used,
-                constructor: None,
-            }),
-        );
-        let get_output = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_output,
-                constructor: None,
-            }),
-        );
-        let get_error = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_error,
-                constructor: None,
-            }),
-        );
+        let get_gas_used =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_gas_used))
+                .build();
+
+        let get_output =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_output)).build();
+
+        let get_error =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_error)).build();
+
         let obj = JsObject::default();
         obj.set(
             "gas_used",
@@ -312,42 +277,34 @@ impl Op {
     fn to_number(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("opcode", ctx)
     }
     fn to_string(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
-        let val = value.as_object().ok_or_else(JsValue::undefined)?;
+        let val = value
+            .as_object()
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?;
         let opcode = Opcode(val.get("opcode", ctx)?.to_i32(ctx)? as u8);
 
         Ok(JsValue::String(JsString::from(Self::to_str(opcode))))
     }
     fn is_push(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
-        let val = value.as_object().ok_or_else(JsValue::undefined)?;
+        let val = value
+            .as_object()
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?;
         let opcode = Opcode(val.get("opcode", ctx)?.to_i32(ctx)? as u8);
         Ok(JsValue::Boolean(opcode.is_push().is_some()))
     }
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
-        let to_number = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::to_number,
-                constructor: None,
-            }),
-        );
-        let to_string = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::to_string,
-                constructor: None,
-            }),
-        );
-        let is_push = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::is_push,
-                constructor: None,
-            }),
-        );
+        let to_number =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::to_number)).build();
+
+        let to_string =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::to_string)).build();
+
+        let is_push =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::is_push)).build();
+
         let opcode = JsValue::Integer(self.opcode.as_u8() as i32);
 
         let obj = JsObject::default();
@@ -518,34 +475,29 @@ impl Stack {
     fn peek(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let index = params
             .get(0)
-            .ok_or_else(|| JsValue::String(JsString::from("peek params is empty")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from("peek params is empty")))
+            })?
             .to_i32(ctx)?;
         value
             .as_object()
-            .ok_or_else(|| JsValue::String(JsString::from("peek value as_object")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from("peek value as_object")))
+            })?
             .get(format!("data{}", index), ctx)
     }
     fn length(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::Integer(0))?
+            .ok_or_else(|| JsError::from_opaque(JsValue::Integer(0)))?
             .get("data_length", ctx)
     }
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
-        let peek = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::peek,
-                constructor: None,
-            }),
-        );
-        let length = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::length,
-                constructor: None,
-            }),
-        );
+        let peek = FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::peek)).build();
+
+        let length =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::length)).build();
+
         let obj = JsObject::default();
         for (index, value) in self.data.iter().enumerate() {
             obj.set(
@@ -577,16 +529,20 @@ impl Memory {
     fn slice(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let start = params
             .get(0)
-            .ok_or_else(|| JsValue::String(JsString::from("slice params 0 is empty")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from("slice params 0 is empty")))
+            })?
             .to_u32(ctx)? as usize;
         let mut end = params
             .get(1)
-            .ok_or_else(|| JsValue::String(JsString::from("slice params 1 is empty")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from("slice params 1 is empty")))
+            })?
             .to_u32(ctx)? as usize;
 
         let length = value
             .as_object()
-            .ok_or(JsValue::Integer(0))?
+            .ok_or_else(|| JsError::from_opaque(JsValue::Integer(0)))?
             .get("data_length", ctx)?
             .to_u32(ctx)? as usize;
         if end > length {
@@ -597,12 +553,21 @@ impl Memory {
         }
         let data = value
             .as_object()
-            .ok_or_else(|| JsValue::String(JsString::from("slice value as_object")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from("slice value as_object")))
+            })?
             .get("data", ctx)?
             .to_string(ctx)?
-            .to_string();
-        let data = hex::decode(data)
-            .map_err(|_| JsValue::String(JsString::from("slice hex::decode(data) error")))?;
+            .to_std_string()
+            .map_err(|_| {
+                JsError::from_opaque(JsValue::String(JsString::from("to_std_string error")))
+            })?;
+
+        let data = hex::decode(data).map_err(|_| {
+            JsError::from_opaque(JsValue::String(JsString::from(
+                "slice hex::decode(data) error",
+            )))
+        })?;
         let mut ret_data = vec![];
         for index in start..end {
             if let Some(v) = data.get(index) {
@@ -614,44 +579,44 @@ impl Memory {
     fn get_uint(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let index = params
             .get(0)
-            .ok_or_else(|| JsValue::String(JsString::from("get_uint params 0 is empty")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from(
+                    "get_uint params 0 is empty",
+                )))
+            })?
             .to_u32(ctx)?;
         value
             .as_object()
-            .ok_or_else(|| JsValue::String(JsString::from("get_uint value as_object 1")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from(
+                    "get_uint value as_object 1",
+                )))
+            })?
             .get("data", ctx)?
             .as_object()
-            .ok_or_else(|| JsValue::String(JsString::from("get_uint value as_object 2")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from(
+                    "get_uint value as_object 2",
+                )))
+            })?
             .get(index as usize + 32, ctx)
     }
     fn length(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or(JsValue::Integer(0))?
+            .ok_or(JsError::from_opaque(JsValue::Integer(0)))?
             .get("data_length", ctx)
     }
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
-        let slice = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::slice,
-                constructor: None,
-            }),
-        );
-        let get_uint = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_uint,
-                constructor: None,
-            }),
-        );
-        let length = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::length,
-                constructor: None,
-            }),
-        );
+        let slice =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::slice)).build();
+
+        let get_uint =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_uint)).build();
+
+        let length =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::length)).build();
+
         let obj = JsObject::default();
         obj.set(
             "data",
@@ -690,56 +655,40 @@ impl Contract {
     fn get_caller(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("caller", ctx)
     }
     fn get_address(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("address", ctx)
     }
     fn get_value(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("value", ctx)
     }
     fn get_input(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("input", ctx)
     }
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
-        let get_caller = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_caller,
-                constructor: None,
-            }),
-        );
-        let get_address = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_address,
-                constructor: None,
-            }),
-        );
-        let get_value = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_value,
-                constructor: None,
-            }),
-        );
-        let get_input = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_input,
-                constructor: None,
-            }),
-        );
+        let get_caller =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_caller)).build();
+
+        let get_address =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_address)).build();
+
+        let get_value =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_value)).build();
+
+        let get_input =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_input)).build();
+
         let obj = JsObject::default();
         obj.set(
             "caller",
@@ -819,82 +768,58 @@ impl Log {
     fn get_pc(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("pc", ctx)
     }
     fn get_gas(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("gas", ctx)
     }
     fn get_cost(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("cost", ctx)
     }
     fn get_depth(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("depth", ctx)
     }
     fn get_refund(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("refund", ctx)
     }
     fn get_error(value: &JsValue, _params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         value
             .as_object()
-            .ok_or_else(JsValue::undefined)?
+            .ok_or_else(|| JsError::from_opaque(JsValue::undefined()))?
             .get("err", ctx)
     }
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
-        let get_pc = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_pc,
-                constructor: None,
-            }),
-        );
-        let get_gas = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_gas,
-                constructor: None,
-            }),
-        );
-        let get_cost = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_cost,
-                constructor: None,
-            }),
-        );
-        let get_depth = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_depth,
-                constructor: None,
-            }),
-        );
-        let get_refund = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_refund,
-                constructor: None,
-            }),
-        );
-        let get_error = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_error,
-                constructor: None,
-            }),
-        );
+        let get_pc =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_pc)).build();
+
+        let get_gas =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_gas)).build();
+
+        let get_cost =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_cost)).build();
+
+        let get_depth =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_depth)).build();
+
+        let get_refund =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_refund)).build();
+
+        let get_error =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_error)).build();
+
         let op = self.op.to_jsobject(ctx)?;
 
         let contract = self.contract.to_jsobject(ctx)?;
@@ -954,17 +879,34 @@ impl DB {
     fn get_balance(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let height = value
             .as_object()
-            .ok_or_else(|| JsValue::String(JsString::from("get_balance value.as_object()")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from(
+                    "get_balance value.as_object()",
+                )))
+            })?
             .get("height", ctx)?
             .to_u32(ctx)?;
+
         let address = H160::from_str(
             params
                 .get(0)
-                .ok_or_else(|| JsValue::String(JsString::from("get_balance params is empty")))?
+                .ok_or_else(|| {
+                    JsError::from_opaque(JsValue::String(JsString::from(
+                        "get_balance params is empty",
+                    )))
+                })?
                 .to_string(ctx)?
+                .to_std_string()
+                .map_err(|_| {
+                    JsError::from_opaque(JsValue::String(JsString::from("to_std_string error")))
+                })?
                 .as_str(),
         )
-        .map_err(|_| JsValue::String(JsString::from("get_balance from_str error")))?;
+        .map_err(|_| {
+            JsError::from_opaque(JsValue::String(JsString::from(
+                "get_balance from_str error",
+            )))
+        })?;
         if let Some(pool) = REDIS_POOL.get().as_ref() {
             let info = pool
                 .get()
@@ -984,17 +926,31 @@ impl DB {
     fn get_nonce(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let height = value
             .as_object()
-            .ok_or_else(|| JsValue::String(JsString::from("get_nonce value.as_object()")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from(
+                    "get_nonce value.as_object()",
+                )))
+            })?
             .get("height", ctx)?
             .to_u32(ctx)?;
         let address = H160::from_str(
             params
                 .get(0)
-                .ok_or_else(|| JsValue::String(JsString::from("get_nonce params is empty")))?
+                .ok_or_else(|| {
+                    JsError::from_opaque(JsValue::String(JsString::from(
+                        "get_nonce params is empty",
+                    )))
+                })?
                 .to_string(ctx)?
+                .to_std_string()
+                .map_err(|_| {
+                    JsError::from_opaque(JsValue::String(JsString::from("to_std_string error")))
+                })?
                 .as_str(),
         )
-        .map_err(|_| JsValue::String(JsString::from("get_nonce from_str error")))?;
+        .map_err(|_| {
+            JsError::from_opaque(JsValue::String(JsString::from("get_nonce from_str error")))
+        })?;
         if let Some(pool) = REDIS_POOL.get().as_ref() {
             let info = pool
                 .get()
@@ -1014,17 +970,31 @@ impl DB {
     fn get_code(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let height = value
             .as_object()
-            .ok_or_else(|| JsValue::String(JsString::from("get_code value.as_object()")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from(
+                    "get_code value.as_object()",
+                )))
+            })?
             .get("height", ctx)?
             .to_u32(ctx)?;
         let address = H160::from_str(
             params
                 .get(0)
-                .ok_or_else(|| JsValue::String(JsString::from("get_code params is empty")))?
+                .ok_or_else(|| {
+                    JsError::from_opaque(JsValue::String(JsString::from(
+                        "get_code params is empty",
+                    )))
+                })?
                 .to_string(ctx)?
+                .to_std_string()
+                .map_err(|_| {
+                    JsError::from_opaque(JsValue::String(JsString::from("to_std_string error")))
+                })?
                 .as_str(),
         )
-        .map_err(|_| JsValue::String(JsString::from("get_code from_str error")))?;
+        .map_err(|_| {
+            JsError::from_opaque(JsValue::String(JsString::from("get_code from_str error")))
+        })?;
         if let Some(pool) = REDIS_POOL.get().as_ref() {
             let info = pool
                 .get()
@@ -1049,25 +1019,53 @@ impl DB {
     fn get_state(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let height = value
             .as_object()
-            .ok_or_else(|| JsValue::String(JsString::from("get_state value.as_object()")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from(
+                    "get_state value.as_object()",
+                )))
+            })?
             .get("height", ctx)?
             .to_u32(ctx)?;
         let address = H160::from_str(
             params
                 .get(0)
-                .ok_or_else(|| JsValue::String(JsString::from("get_state params is empty 0")))?
+                .ok_or_else(|| {
+                    JsError::from_opaque(JsValue::String(JsString::from(
+                        "get_state params is empty 0",
+                    )))
+                })?
                 .to_string(ctx)?
+                .to_std_string()
+                .map_err(|_| {
+                    JsError::from_opaque(JsValue::String(JsString::from("to_std_string error")))
+                })?
                 .as_str(),
         )
-        .map_err(|_| JsValue::String(JsString::from("get_state H160 from_str error")))?;
+        .map_err(|_| {
+            JsError::from_opaque(JsValue::String(JsString::from(
+                "get_state H160 from_str error",
+            )))
+        })?;
         let index = H256::from_str(
             params
                 .get(0)
-                .ok_or_else(|| JsValue::String(JsString::from("get_state params is empty 1")))?
+                .ok_or_else(|| {
+                    JsError::from_opaque(JsValue::String(JsString::from(
+                        "get_state params is empty 1",
+                    )))
+                })?
                 .to_string(ctx)?
+                .to_std_string()
+                .map_err(|_| {
+                    JsError::from_opaque(JsValue::String(JsString::from("to_std_string error")))
+                })?
                 .as_str(),
         )
-        .map_err(|_| JsValue::String(JsString::from("get_state H160 from_str error")))?;
+        .map_err(|_| {
+            JsError::from_opaque(JsValue::String(JsString::from(
+                "get_state H160 from_str error",
+            )))
+        })?;
         if let Some(pool) = REDIS_POOL.get().as_ref() {
             let info = pool
                 .get()
@@ -1089,17 +1087,31 @@ impl DB {
     fn exists(value: &JsValue, params: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let height = value
             .as_object()
-            .ok_or_else(|| JsValue::String(JsString::from("exists value.as_object()")))?
+            .ok_or_else(|| {
+                JsError::from_opaque(JsValue::String(JsString::from("exists value.as_object()")))
+            })?
             .get("height", ctx)?
             .to_u32(ctx)?;
         let address = H160::from_str(
             params
                 .get(0)
-                .ok_or_else(|| JsValue::String(JsString::from("get_state params is empty")))?
+                .ok_or_else(|| {
+                    JsError::from_opaque(JsValue::String(JsString::from(
+                        "get_state params is empty",
+                    )))
+                })?
                 .to_string(ctx)?
+                .to_std_string()
+                .map_err(|_| {
+                    JsError::from_opaque(JsValue::String(JsString::from("to_std_string error")))
+                })?
                 .as_str(),
         )
-        .map_err(|_| JsValue::String(JsString::from("exists H160 from_str error")))?;
+        .map_err(|_| {
+            JsError::from_opaque(JsValue::String(JsString::from(
+                "exists H160 from_str error",
+            )))
+        })?;
         if let Some(pool) = REDIS_POOL.get().as_ref() {
             let info = pool
                 .get()
@@ -1117,41 +1129,21 @@ impl DB {
         }
     }
     pub fn to_jsobject(&self, ctx: &mut Context) -> JsResult<JsObject> {
-        let get_balance = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_balance,
-                constructor: None,
-            }),
-        );
-        let get_nonce = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_nonce,
-                constructor: None,
-            }),
-        );
-        let get_code = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_code,
-                constructor: None,
-            }),
-        );
-        let get_state = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::get_state,
-                constructor: None,
-            }),
-        );
-        let exists = JsObject::from_proto_and_data(
-            ctx.intrinsics().constructors().function().prototype(),
-            ObjectData::function(Function::Native {
-                function: Self::exists,
-                constructor: None,
-            }),
-        );
+        let get_balance =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_balance)).build();
+
+        let get_nonce =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_nonce)).build();
+
+        let get_code =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_code)).build();
+
+        let get_state =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::get_state)).build();
+
+        let exists =
+            FunctionObjectBuilder::new(ctx, NativeFunction::from_fn_ptr(Self::exists)).build();
+
         let obj = JsObject::default();
         obj.set(
             "height",

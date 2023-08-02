@@ -1,7 +1,9 @@
 use {
     super::params::{Cfg, Ctx, Frame, FrameResult, Log, DB},
     crate::rpc::debugapi::types::TraceParams,
-    boa_engine::{prelude::JsObject, Context, JsResult, JsString, JsValue},
+    boa_engine::{
+        prelude::JsObject, Context, JsError, JsResult, JsString, JsValue, NativeFunction, Source,
+    },
     chrono::{DateTime, UTC},
     ethereum_types::{H160, H256, U256},
     evm::Opcode,
@@ -9,8 +11,8 @@ use {
     std::cell::RefCell,
 };
 
-pub struct Func {
-    context: RefCell<Context>,
+pub struct Func<'a> {
+    context: RefCell<Context<'a>>,
     this: JsValue,
     result_func: JsObject,
     fault_func: JsObject,
@@ -19,10 +21,10 @@ pub struct Func {
     exit_func: Option<JsObject>,
     setup_func: Option<JsObject>,
 }
-impl Func {
+impl<'a> Func<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        context: Context,
+        context: Context<'a>,
         this: JsValue,
         result_func: JsObject,
         fault_func: JsObject,
@@ -292,10 +294,6 @@ impl Func {
                 context,
             )
             .map_err(|e| {
-                println!(
-                    "e.to_string(context).unwrap():{:?}",
-                    e.to_string(context).unwrap()
-                );
                 let mut err = Error::internal_error();
                 err.message = "call result function error".to_owned();
                 err
@@ -329,10 +327,10 @@ fn js_func(_value: &JsValue, params: &[JsValue], _ctx: &mut Context) -> JsResult
     params
         .get(0)
         .cloned()
-        .ok_or_else(|| JsValue::String(JsString::from("params is empty")))
+        .ok_or_else(|| JsError::from_opaque(JsValue::String(JsString::from("params is empty"))))
 }
 
-pub fn parse_tracer(tracer: &Option<String>) -> Result<Option<Func>> {
+pub fn parse_tracer<'a>(mut ctx: Context<'a>, tracer: &Option<String>) -> Result<Option<Func<'a>>> {
     let tracer = match tracer {
         Some(t) => t,
         None => return Ok(None),
@@ -341,11 +339,13 @@ pub fn parse_tracer(tracer: &Option<String>) -> Result<Option<Func>> {
         return Ok(None);
     }
     let tracer = format!("({})", tracer);
-    let mut ctx = Context::default();
-    ctx.register_global_function("toHex", 0, js_func);
-    ctx.register_global_function("toAddress", 0, js_func);
-    ctx.register_global_function("bigInt", 0, js_func);
-    let value = ctx.eval(&tracer).map_err(|_| {
+
+    let func = NativeFunction::from_fn_ptr(js_func);
+
+    ctx.register_global_callable("toHex", 0, func.clone());
+    ctx.register_global_callable("toAddress", 0, func.clone());
+    ctx.register_global_callable("bigInt", 0, func);
+    let value = ctx.eval(Source::from_bytes(&tracer)).map_err(|_| {
         let mut err = Error::internal_error();
         err.message = "javascript exec failed".to_owned();
         err

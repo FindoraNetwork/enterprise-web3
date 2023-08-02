@@ -59,7 +59,7 @@ fn main() {
             continue;
         };
 
-        let (accountstores, codes, account_storages) = pnk!(get_account_info(
+        let (accountstores, codes, accounts, allowances, total_issuance) = pnk!(get_account_info(
             &statedb,
             if Ordering::Equal == height.cmp(&current_height) {
                 0
@@ -76,9 +76,14 @@ fn main() {
         for (address, code) in codes {
             pnk!(setter.set_byte_code(h, address, code));
         }
-        for ((address, index), value) in account_storages {
+        for ((address, index), value) in accounts {
             pnk!(setter.set_state(h, address, index, value));
         }
+
+        for ((owner, spender), value) in allowances {
+            pnk!(setter.set_allowances(h, owner, spender, value));
+        }
+        pnk!(setter.set_total_issuance(h, total_issuance));
 
         pnk!(setter.set_height(height.as_u32()));
 

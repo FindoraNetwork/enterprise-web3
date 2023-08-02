@@ -250,4 +250,24 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
 
         Ok(())
     }
+
+    pub fn set_total_issuance(&mut self, height: u32, value: U256) -> Result<()> {
+        let key = keys::total_issuance_key(&self.prefix);
+        self.conn
+            .vkv_set(key.clone(), height, serde_json::to_string(&value)?)?;
+        Ok(())
+    }
+
+    pub fn set_allowances(
+        &mut self,
+        height: u32,
+        owner: H160,
+        spender: H160,
+        value: U256,
+    ) -> Result<()> {
+        let key = keys::allowances_key(&self.prefix, owner, spender);
+        self.conn
+            .vkv_set(key.clone(), height, serde_json::to_string(&value)?)?;
+        Ok(())
+    }
 }

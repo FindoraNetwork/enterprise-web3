@@ -338,7 +338,7 @@ impl EthApi for EthService {
         let config = evm::Config::istanbul();
 
         let metadata = StackSubstateMetadata::new(gas_limit, &config);
-        let precompile_set = Web3EvmPrecompiles::default();
+        let precompile_set = Web3EvmPrecompiles::new(height);
         let mut executor = StackExecutor::new_with_precompiles(
             Web3EvmStackstate::new(
                 U256::from(self.gas_price),
@@ -997,7 +997,7 @@ impl EthApi for EthService {
                 let config = evm::Config::istanbul();
 
                 let metadata = StackSubstateMetadata::new(gas_limit, &config);
-                let precompile_set = Web3EvmPrecompiles::default();
+                let precompile_set = Web3EvmPrecompiles::new(height);
                 let mut executor = StackExecutor::new_with_precompiles(
                     Web3EvmStackstate::new(
                         U256::from(self.gas_price),
