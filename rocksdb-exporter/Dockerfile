@@ -1,4 +1,4 @@
-FROM 358484141435.dkr.ecr.us-west-2.amazonaws.com/enterprise-web3:latest AS fundation
+FROM ghcr.io/findoranetwork/enterprise-web3:latest AS fundation
 
 FROM debian:bullseye-slim
 RUN apt-get update -y && apt-get install -y wget redis-tools
