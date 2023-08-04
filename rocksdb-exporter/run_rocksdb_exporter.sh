@@ -14,7 +14,7 @@ fi
 CHAINDATA_URL=$(cut -d , -f 1 "${ROOT_DIR}/latest")
 rm ${ROOT_DIR}/latest -f
 
-if ! wget -O "${ROOT_DIR}/snapshot.tar.gz" "${CHAINDATA_URL}"; then
+if ! wget -O "${ROOT_DIR}/snapshot/snapshot.tar.gz" "${CHAINDATA_URL}"; then
     echo "download latest failed, exit shell script"
     exit -1
 fi
@@ -22,7 +22,7 @@ fi
 rm -rvf ${ROOT_DIR}/data/tendermint/mainnet/node0/data
 rm -rvf ${ROOT_DIR}/data/ledger
 
-tar -xvf ${ROOT_DIR}/snapshot.tar.gz -C ${ROOT_DIR}
+tar -xvf ${ROOT_DIR}/snapshot/snapshot.tar.gz -C ${ROOT_DIR}
 
 cat ${ROOT_DIR}/versioned-kv.lua | redis-cli -h ${REDIS_HOST} -p ${REDIS_PORT} -x FUNCTION LOAD REPLACE
 sed -i "s#127.0.0.1#${REDIS_HOST}#g" ${ROOT_DIR}/rocksdb-exporter-config.toml
