@@ -4,18 +4,13 @@ use {
         keys,
         types::{Block, TransactionStatus},
         utils::recover_signer,
-        Receipt,
+        ConnectionType, Receipt,
     },
     ethereum::LegacyTransaction,
     primitive_types::{H160, H256, U256},
     redis::{Commands, Connection},
     redis_versioned_kv::VersionedKVCommand,
 };
-
-pub enum ConnectionType {
-    Redis(Connection),
-    // Postgres(PgConnection),
-}
 
 pub trait Setter {
     fn new(conn: ConnectionType, something: String) -> Result<Self>

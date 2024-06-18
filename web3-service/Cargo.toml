@@ -24,8 +24,7 @@ jsonrpc-core = "18.0"
 jsonrpc-pubsub = "18.0"
 jsonrpc-derive = "18.0"
 
-redis = { version = "0.25", default-features = false, features = [ "tls", "r2d2" ] }
-r2d2 = { version = "0.8.8"}
+redis = { version = "0.25", default-features = false, features = [ "tls-native-tls" ] }
 
 attohttpc = { version = "0.18", default-features = false, features = ["compress", "json", "tls-rustls"] }
 tokio = { version = "1.21.0", features = ["full"] }

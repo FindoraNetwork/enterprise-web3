@@ -14,3 +14,8 @@ pub use setter::*;
 
 mod utils;
 pub use utils::*;
+
+pub enum ConnectionType {
+    Redis(redis::Connection),
+    // Postgres(PgConnection),
+}

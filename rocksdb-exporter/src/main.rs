@@ -34,8 +34,8 @@ fn main() {
         pnk!(setter.clear());
         U256::zero()
     } else {
-        let mut conn = pnk!(pool.get());
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let conn = pnk!(client.get_connection());
+        let mut getter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         U256::from(pnk!(getter.latest_height()))
     };
 
