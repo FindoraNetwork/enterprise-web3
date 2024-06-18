@@ -3,7 +3,7 @@ mod evm_rocksdb_storage;
 
 use {
     config::Config,
-    evm_exporter::{Getter, Setter, PREFIX},
+    evm_exporter::{ConnectionType, Getter, Setter, PREFIX},
     evm_rocksdb_storage::{
         evm_rocksdb::RocksDB, get_account_info, get_block_info, get_current_height,
     },
@@ -26,9 +26,8 @@ fn main() {
     #[cfg(not(feature = "cluster_redis"))]
     let client = pnk!(redis::Client::open(config.redis_url[0].as_ref()));
 
-    let pool = Arc::new(pnk!(r2d2::Pool::builder().max_size(50).build(client)));
-    let mut conn = pnk!(pool.get());
-    let mut setter = Setter::new(&mut *conn, PREFIX.to_string());
+    let conn = pnk!(client.get_connection());
+    let mut setter = Setter::new(ConnectionType::Redis(conn), PREFIX.to_string());
     let current_height = pnk!(get_current_height(&hisdb));
 
     let mut height = if config.clear {

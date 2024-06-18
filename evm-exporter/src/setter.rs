@@ -8,37 +8,87 @@ use {
     },
     ethereum::LegacyTransaction,
     primitive_types::{H160, H256, U256},
-    redis::{Commands, ConnectionLike},
+    redis::{Commands, Connection},
     redis_versioned_kv::VersionedKVCommand,
 };
 
-pub struct Setter<'a, C> {
-    conn: &'a mut C,
+pub enum ConnectionType {
+    Redis(Connection),
+    // Postgres(PgConnection),
+}
+
+pub trait Setter {
+    fn new(conn: ConnectionType, something: String) -> Result<Self>
+    where
+        Self: std::marker::Sized;
+    fn clear(&mut self) -> Result<()>;
+    fn set_height(&mut self, height: u32) -> Result<()>;
+    fn set_lowest_height(&mut self, height: u32) -> Result<()>;
+    fn set_balance(&mut self, height: u32, address: H160, balance: U256) -> Result<()>;
+    fn remove_balance(&mut self, height: u32, address: H160) -> Result<()>;
+    fn set_nonce(&mut self, height: u32, address: H160, nonce: U256) -> Result<()>;
+    fn remove_nonce(&mut self, height: u32, address: H160) -> Result<()>;
+    fn set_byte_code(&mut self, height: u32, address: H160, code: Vec<u8>) -> Result<()>;
+    fn remove_byte_code(&mut self, height: u32, address: H160) -> Result<()>;
+
+    fn set_state(&mut self, height: u32, address: H160, index: H256, value: H256) -> Result<()>;
+
+    fn remove_state(&mut self, height: u32, address: H160, index: H256) -> Result<()>;
+
+    fn set_block_info(
+        &mut self,
+        block: Block,
+        receipts: Vec<Receipt>,
+        statuses: Vec<TransactionStatus>,
+    ) -> Result<()>;
+    fn remove_block_info(&mut self, height: U256) -> Result<()>;
+    fn set_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()>;
+    fn set_pending_code(&mut self, address: H160, code: Vec<u8>) -> Result<()>;
+    fn set_pending_state(&mut self, address: H160, index: H256, value: H256) -> Result<()>;
+    fn remove_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()>;
+    fn remove_pending_code(&mut self, address: H160) -> Result<()>;
+    fn remove_pending_state(&mut self, address: H160, index: H256) -> Result<()>;
+    fn set_total_issuance(&mut self, height: u32, value: U256) -> Result<()>;
+    fn set_allowances(
+        &mut self,
+        height: u32,
+        owner: H160,
+        spender: H160,
+        value: U256,
+    ) -> Result<()>;
+}
+
+pub struct RedisSetter {
+    conn: Connection,
     pub prefix: String,
 }
 
-impl<'a, C: ConnectionLike> Setter<'a, C> {
-    pub fn new(conn: &'a mut C, prefix: String) -> Self {
-        Self { conn, prefix }
+impl Setter for RedisSetter {
+    fn new(connection: ConnectionType, prefix: String) -> Result<Self> {
+        if let ConnectionType::Redis(conn) = connection {
+            Ok(Self { conn, prefix })
+        } else {
+            Err(Error::Others("Invalid connection type for Redis".into()))
+        }
     }
 
-    pub fn clear(&mut self) -> Result<()> {
-        redis::cmd("FLUSHDB").arg("SYNC").query(self.conn)?;
+    fn clear(&mut self) -> Result<()> {
+        redis::cmd("FLUSHDB").arg("SYNC").query(&mut self.conn)?;
         Ok(())
     }
 
-    pub fn set_height(&mut self, height: u32) -> Result<()> {
+    fn set_height(&mut self, height: u32) -> Result<()> {
         let height_key = keys::latest_height_key(&self.prefix);
         self.conn.set(height_key, format!("{}", height))?;
         Ok(())
     }
-    pub fn set_lowest_height(&mut self, height: u32) -> Result<()> {
+    fn set_lowest_height(&mut self, height: u32) -> Result<()> {
         let height_key = keys::lowest_height_key(&self.prefix);
         self.conn.set(height_key, format!("{}", height))?;
         Ok(())
     }
 
-    pub fn set_balance(&mut self, height: u32, address: H160, balance: U256) -> Result<()> {
+    fn set_balance(&mut self, height: u32, address: H160, balance: U256) -> Result<()> {
         let balance_key = keys::balance_key(&self.prefix, address);
         self.conn
             .vkv_set(balance_key, height, serde_json::to_string(&balance)?)?;
@@ -46,43 +96,37 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         Ok(())
     }
 
-    pub fn remove_balance(&mut self, height: u32, address: H160) -> Result<()> {
+    fn remove_balance(&mut self, height: u32, address: H160) -> Result<()> {
         let balance_key = keys::balance_key(&self.prefix, address);
         self.conn.vkv_del(balance_key, height)?;
         Ok(())
     }
 
-    pub fn set_nonce(&mut self, height: u32, address: H160, nonce: U256) -> Result<()> {
+    fn set_nonce(&mut self, height: u32, address: H160, nonce: U256) -> Result<()> {
         let nonce_key = keys::nonce_key(&self.prefix, address);
         self.conn
             .vkv_set(nonce_key, height, serde_json::to_string(&nonce)?)?;
 
         Ok(())
     }
-    pub fn remove_nonce(&mut self, height: u32, address: H160) -> Result<()> {
+    fn remove_nonce(&mut self, height: u32, address: H160) -> Result<()> {
         let nonce_key = keys::nonce_key(&self.prefix, address);
         self.conn.vkv_del(nonce_key, height)?;
         Ok(())
     }
-    pub fn set_byte_code(&mut self, height: u32, address: H160, code: Vec<u8>) -> Result<()> {
+    fn set_byte_code(&mut self, height: u32, address: H160, code: Vec<u8>) -> Result<()> {
         let code_key = keys::code_key(&self.prefix, address);
         self.conn.vkv_set(code_key, height, hex::encode(code))?;
 
         Ok(())
     }
-    pub fn remove_byte_code(&mut self, height: u32, address: H160) -> Result<()> {
+    fn remove_byte_code(&mut self, height: u32, address: H160) -> Result<()> {
         let code_key = keys::code_key(&self.prefix, address);
         self.conn.vkv_del(code_key, height)?;
         Ok(())
     }
 
-    pub fn set_state(
-        &mut self,
-        height: u32,
-        address: H160,
-        index: H256,
-        value: H256,
-    ) -> Result<()> {
+    fn set_state(&mut self, height: u32, address: H160, index: H256, value: H256) -> Result<()> {
         let key = keys::state_key(&self.prefix, address, index);
         self.conn
             .vkv_set(key, height, serde_json::to_string(&value)?)?;
@@ -92,7 +136,7 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         Ok(())
     }
 
-    pub fn remove_state(&mut self, height: u32, address: H160, index: H256) -> Result<()> {
+    fn remove_state(&mut self, height: u32, address: H160, index: H256) -> Result<()> {
         let key = keys::state_key(&self.prefix, address, index);
         self.conn.vkv_del(key, height)?;
         let state_addr_key = keys::state_addr_key(&self.prefix, address);
@@ -100,7 +144,7 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         Ok(())
     }
 
-    pub fn set_block_info(
+    fn set_block_info(
         &mut self,
         block: Block,
         receipts: Vec<Receipt>,
@@ -139,7 +183,7 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         Ok(())
     }
 
-    pub fn remove_block_info(&mut self, height: U256) -> Result<()> {
+    fn remove_block_info(&mut self, height: U256) -> Result<()> {
         let block_hash_key = keys::block_hash_key(&self.prefix, height);
         let block_hash: H256 = match self
             .conn
@@ -176,7 +220,7 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         Ok(())
     }
 
-    pub fn set_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()> {
+    fn set_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()> {
         let sign_address = recover_signer(&transaction)?;
 
         let height_key = keys::latest_height_key(&self.prefix);
@@ -211,14 +255,14 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         Ok(())
     }
 
-    pub fn set_pending_code(&mut self, address: H160, code: Vec<u8>) -> Result<()> {
+    fn set_pending_code(&mut self, address: H160, code: Vec<u8>) -> Result<()> {
         let pending_code_key = keys::pending_code_key(&self.prefix, address);
         self.conn
             .set(pending_code_key, serde_json::to_string(&code)?)?;
         Ok(())
     }
 
-    pub fn set_pending_state(&mut self, address: H160, index: H256, value: H256) -> Result<()> {
+    fn set_pending_state(&mut self, address: H160, index: H256, value: H256) -> Result<()> {
         let pending_state_key = keys::pending_state_key(&self.prefix, address, index);
         self.conn
             .set(pending_state_key, serde_json::to_string(&value)?)?;
@@ -226,7 +270,7 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         Ok(())
     }
 
-    pub fn remove_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()> {
+    fn remove_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()> {
         let sign_address = recover_signer(&transaction)?;
         let pending_balance_key = keys::pending_balance_key(&self.prefix, sign_address);
 
@@ -238,27 +282,27 @@ impl<'a, C: ConnectionLike> Setter<'a, C> {
         Ok(())
     }
 
-    pub fn remove_pending_code(&mut self, address: H160) -> Result<()> {
+    fn remove_pending_code(&mut self, address: H160) -> Result<()> {
         let pending_code_key = keys::pending_code_key(&self.prefix, address);
         self.conn.del(pending_code_key)?;
         Ok(())
     }
 
-    pub fn remove_pending_state(&mut self, address: H160, index: H256) -> Result<()> {
+    fn remove_pending_state(&mut self, address: H160, index: H256) -> Result<()> {
         let pending_state_key = keys::pending_state_key(&self.prefix, address, index);
         self.conn.del(pending_state_key)?;
 
         Ok(())
     }
 
-    pub fn set_total_issuance(&mut self, height: u32, value: U256) -> Result<()> {
+    fn set_total_issuance(&mut self, height: u32, value: U256) -> Result<()> {
         let key = keys::total_issuance_key(&self.prefix);
         self.conn
             .vkv_set(key, height, serde_json::to_string(&value)?)?;
         Ok(())
     }
 
-    pub fn set_allowances(
+    fn set_allowances(
         &mut self,
         height: u32,
         owner: H160,

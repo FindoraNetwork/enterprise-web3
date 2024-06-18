@@ -25,6 +25,9 @@ pub enum Error {
 
     #[error(transparent)]
     Libsecp256k1Error(#[from] libsecp256k1::Error),
+
+    #[error("others failed:{0}")]
+    Others(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

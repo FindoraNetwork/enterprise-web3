@@ -10,13 +10,13 @@ primitive-types = "0.11.1"
 thiserror = "1.0.34"
 ethereum-types = { version = "0.13.1", default-features = false, features = ["serialize"] }
 
-redis = { version = "0.21", default-features = false }
+redis = { version = "0.25", default-features = false }
 redis-versioned-kv = { path = "../redis-versioned-kv" }
 hex = "0.4.3"
 uint = "0.9.3"
 sha3 = "0.8"
 libsecp256k1 = { version = "0.5", features = ["static-context", "hmac"] }
-
+# sqlx = { version = "0.7", default-features = false, features = ["macros", "json", "postgres", "time", "uuid", "bigdecimal"] }
 ethereum = { version = "0.12.0", default-features = false, features = ["with-serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
