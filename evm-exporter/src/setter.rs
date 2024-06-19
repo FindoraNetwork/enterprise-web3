@@ -13,7 +13,7 @@ use {
 };
 
 pub trait Setter {
-    fn new(conn: ConnectionType, something: String) -> Result<Self>
+    fn new(conn: ConnectionType, something: String) -> Self
     where
         Self: std::marker::Sized;
     fn clear(&mut self) -> Result<()>;
@@ -59,11 +59,11 @@ pub struct RedisSetter {
 }
 
 impl Setter for RedisSetter {
-    fn new(connection: ConnectionType, prefix: String) -> Result<Self> {
+    fn new(connection: ConnectionType, prefix: String) -> Self {
         if let ConnectionType::Redis(conn) = connection {
-            Ok(Self { conn, prefix })
+            Self { conn, prefix }
         } else {
-            Err(Error::Others("Invalid connection type for Redis".into()))
+            panic!("Invalid connection type for Redis")
         }
     }
 

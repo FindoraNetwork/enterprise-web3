@@ -44,16 +44,17 @@ fn main() {
         config.redis_url.clone()
     ));
     #[cfg(not(feature = "cluster_redis"))]
-    let client = pnk!(redis::Client::open(config.redis_url[0].as_ref()));
-    let pool = Arc::new(pnk!(r2d2::Pool::builder().max_size(50).build(client)));
-    REDIS_POOL.set(pool.clone()).expect("REDIS_POOL set error");
+    let client = Arc::new(pnk!(redis::Client::open(config.redis_url[0].as_ref())));
+    REDIS_POOL
+        .set(client.clone())
+        .expect("REDIS_POOL set error");
 
-    pnk!(init_upstream(pool.clone()));
+    pnk!(init_upstream(client.clone()));
     let tm_client = Arc::new(pnk!(HttpClient::new(config.tendermint_url.as_str())));
     let eth = EthService::new(
         config.chain_id,
         config.gas_price,
-        pool.clone(),
+        client.clone(),
         tm_client,
         config.tendermint_url.as_str(),
     );
@@ -62,14 +63,17 @@ fn main() {
     let debug = DebugApiImpl::new(
         config.chain_id,
         config.gas_price,
-        pool.clone(),
+        client.clone(),
         config.tendermint_url.as_str(),
     );
     let health = HealthApiImpl::new();
-    let filter = EthFilterApiImpl::new(pool.clone());
-    let subscriber_notify = Arc::new(SubscriberNotify::new(pool.clone(), &config.tendermint_url));
+    let filter = EthFilterApiImpl::new(client.clone());
+    let subscriber_notify = Arc::new(SubscriberNotify::new(
+        client.clone(),
+        &config.tendermint_url,
+    ));
     pnk!(subscriber_notify.start());
-    let pub_sub = EthPubSubApiImpl::new(pool, subscriber_notify);
+    let pub_sub = EthPubSubApiImpl::new(client, subscriber_notify);
 
     let mut io = MetaIoHandler::default();
     io.extend_with(eth.to_delegate());

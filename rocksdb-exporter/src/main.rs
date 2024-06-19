@@ -3,7 +3,7 @@ mod evm_rocksdb_storage;
 
 use {
     config::Config,
-    evm_exporter::{ConnectionType, Getter, Setter, PREFIX},
+    evm_exporter::{ConnectionType, Getter, RedisGetter, RedisSetter, Setter, PREFIX},
     evm_rocksdb_storage::{
         evm_rocksdb::RocksDB, get_account_info, get_block_info, get_current_height,
     },
@@ -27,7 +27,7 @@ fn main() {
     let client = pnk!(redis::Client::open(config.redis_url[0].as_ref()));
 
     let conn = pnk!(client.get_connection());
-    let mut setter = Setter::new(ConnectionType::Redis(conn), PREFIX.to_string());
+    let mut setter: RedisSetter = Setter::new(ConnectionType::Redis(conn), PREFIX.to_string());
     let current_height = pnk!(get_current_height(&hisdb));
 
     let mut height = if config.clear {
@@ -35,7 +35,7 @@ fn main() {
         U256::zero()
     } else {
         let conn = pnk!(client.get_connection());
-        let mut getter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         U256::from(pnk!(getter.latest_height()))
     };
 

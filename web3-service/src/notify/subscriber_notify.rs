@@ -1,7 +1,7 @@
 use {
     crate::notify::notifications::Notifications,
     ethereum_types::{H256, U256},
-    evm_exporter::{Getter, PREFIX},
+    evm_exporter::{ConnectionType, Getter, RedisGetter, PREFIX},
     ruc::*,
     serde_json::Value,
     sha2::{Digest, Sha256},
@@ -21,7 +21,7 @@ pub struct SubscriberNotify {
 pub struct SubscriberNotify {
     tm_url: String,
     millis: u64,
-    redis_pool: Arc<r2d2::Pool<redis::Client>>,
+    redis_pool: Arc<redis::Client>,
     pub logs_event_notify: Arc<Notifications<U256>>,
     pub new_heads_event_notify: Arc<Notifications<U256>>,
     pub new_pending_tx_hash_event_notify: Arc<Notifications<H256>>,
@@ -44,7 +44,7 @@ impl SubscriberNotify {
     }
 
     #[cfg(not(feature = "cluster_redis"))]
-    pub fn new(redis_pool: Arc<r2d2::Pool<redis::Client>>, tm_url: &str) -> Self {
+    pub fn new(redis_pool: Arc<redis::Client>, tm_url: &str) -> Self {
         Self {
             tm_url: String::from(tm_url),
             millis: 2000,
@@ -64,53 +64,51 @@ impl SubscriberNotify {
         let syncing_event_notify = self.syncing_event_notify.clone();
 
         let redis_pool = self.redis_pool.clone();
-        let mut conn = self.redis_pool.get().c(d!())?;
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let conn = self.redis_pool.get_connection().c(d!())?;
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let mut last_height = getter.latest_height().c(d!())?;
 
         let mut last_txhash = vec![];
         let mut last_status = Option::None;
 
         let tm_url = self.tm_url.clone();
-        thread::spawn(move || {
-            let tm_url = tm_url;
-            loop {
-                thread::sleep(ten_millis);
+        thread::spawn(move || loop {
+            thread::sleep(ten_millis);
 
-                if let Ok(mut conn) = redis_pool.get() {
-                    let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
-                    if let Ok(height) = getter.latest_height() {
-                        if last_height != height {
-                            for h in (last_height + 1)..=height {
-                                logs_event_notify.notify(U256::from(h)).unwrap_or_default();
-                                new_heads_event_notify
-                                    .notify(U256::from(h))
-                                    .unwrap_or_default();
-                            }
-                            last_height = height;
-                        }
-                    };
-                }
-
-                if let Ok(hashs) = get_pending_hash(&tm_url) {
-                    for hash in &hashs {
-                        if !last_txhash.contains(hash) {
-                            new_pending_tx_hash_event_notify
-                                .notify(*hash)
+            if let Ok(conn) = redis_pool.get_connection() {
+                let mut getter: RedisGetter =
+                    Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
+                if let Ok(height) = getter.latest_height() {
+                    if last_height != height {
+                        for h in (last_height + 1)..=height {
+                            logs_event_notify.notify(U256::from(h)).unwrap_or_default();
+                            new_heads_event_notify
+                                .notify(U256::from(h))
                                 .unwrap_or_default();
                         }
+                        last_height = height;
                     }
-                    last_txhash = hashs;
+                };
+            }
+
+            if let Ok(hashs) = get_pending_hash(&tm_url) {
+                for hash in &hashs {
+                    if !last_txhash.contains(hash) {
+                        new_pending_tx_hash_event_notify
+                            .notify(*hash)
+                            .unwrap_or_default();
+                    }
                 }
-                if let Ok(status) = get_sync_status(&tm_url) {
-                    let is_send = match last_status {
-                        Some(last) => last != status,
-                        None => true,
-                    };
-                    if is_send {
-                        syncing_event_notify.notify(status).unwrap_or_default();
-                        last_status = Some(status);
-                    }
+                last_txhash = hashs;
+            }
+            if let Ok(status) = get_sync_status(&tm_url) {
+                let is_send = match last_status {
+                    Some(last) => last != status,
+                    None => true,
+                };
+                if is_send {
+                    syncing_event_notify.notify(status).unwrap_or_default();
+                    last_status = Some(status);
                 }
             }
         });

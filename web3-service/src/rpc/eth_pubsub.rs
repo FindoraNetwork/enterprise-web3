@@ -1,7 +1,7 @@
 use {
     crate::notify::SubscriberNotify,
     ethereum_types::{H256, U256},
-    evm_exporter::{Block, Getter, Receipt, PREFIX},
+    evm_exporter::{Block, ConnectionType, Getter, Receipt, RedisGetter, PREFIX},
     futures::{
         executor::ThreadPool,
         task::{FutureObj, Spawn, SpawnError},
@@ -37,15 +37,12 @@ impl Spawn for SubscriptionTaskExecutor {
     }
 }
 pub struct EthPubSubApiImpl {
-    redis_pool: Arc<r2d2::Pool<redis::Client>>,
+    redis_pool: Arc<redis::Client>,
     subscriptions: SubscriptionManager,
     subscriber_notify: Arc<SubscriberNotify>,
 }
 impl EthPubSubApiImpl {
-    pub fn new(
-        redis_pool: Arc<r2d2::Pool<redis::Client>>,
-        subscriber_notify: Arc<SubscriberNotify>,
-    ) -> Self {
+    pub fn new(redis_pool: Arc<redis::Client>, subscriber_notify: Arc<SubscriberNotify>) -> Self {
         Self {
             redis_pool,
             subscriptions: SubscriptionManager::new(Arc::new(SubscriptionTaskExecutor)),
@@ -77,8 +74,8 @@ impl EthPubSubApi for EthPubSubApiImpl {
                         .logs_event_notify
                         .notification_stream()
                         .filter_map(move |block_height| {
-                            let info = redis_pool.get().map(|mut conn| {
-                                let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+                            let info = redis_pool.get_connection().map(| conn| {
+                                let mut getter:RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
                                 match getter.get_block_hash_by_height(block_height) {
                                     Ok(Some(hash)) => {
                                         let block = match getter.get_block_by_hash(hash) {
@@ -129,8 +126,8 @@ impl EthPubSubApi for EthPubSubApiImpl {
                         .new_heads_event_notify
                         .notification_stream()
                         .filter_map(move |block_height| {
-                            let block = redis_pool.get().map(|mut conn|{
-                                let mut getter = Getter::new(&mut *conn, PREFIX.to_string()) ;
+                            let block = redis_pool.get_connection().map(| conn|{
+                                let mut getter:RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string()) ;
                                 match getter.get_block_hash_by_height(block_height) {
                                     Ok(Some(hash)) => {
                                         match getter.get_block_by_hash(hash) {

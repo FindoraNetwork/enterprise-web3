@@ -1,7 +1,7 @@
 use {
     super::{eth::filter_block_logs, internal_err, MAX_PAST_LOGS, MAX_STORED_FILTERS},
     ethereum_types::{H256, U256},
-    evm_exporter::{Block, Getter, TransactionStatus, PREFIX},
+    evm_exporter::{Block, ConnectionType, Getter, RedisGetter, TransactionStatus, PREFIX},
     futures::executor::ThreadPool,
     jsonrpc_core::Result,
     lazy_static::lazy_static,
@@ -28,11 +28,11 @@ const FILTER_RETAIN_THRESHOLD: u64 = 100;
 
 pub struct EthFilterApiImpl {
     filter_pool: FilterPool,
-    redis_pool: Arc<r2d2::Pool<redis::Client>>,
+    redis_pool: Arc<redis::Client>,
 }
 
 impl EthFilterApiImpl {
-    pub fn new(redis_pool: Arc<r2d2::Pool<redis::Client>>) -> Self {
+    pub fn new(redis_pool: Arc<redis::Client>) -> Self {
         let pool = Arc::new(Mutex::new(BTreeMap::new()));
         let instance = Self {
             filter_pool: pool.clone(),
@@ -42,11 +42,11 @@ impl EthFilterApiImpl {
         instance
     }
     fn block_number(&self) -> Result<u64> {
-        let mut conn = self
+        let conn = self
             .redis_pool
-            .get()
+            .get_connection()
             .map_err(|e| internal_err(e.to_string()))?;
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         getter
             .latest_height()
             .map_err(|e| internal_err(e.to_string()))
@@ -85,11 +85,11 @@ impl EthFilterApiImpl {
     }
 
     async fn filter_pool_task(
-        redis_pool: Arc<r2d2::Pool<redis::Client>>,
+        redis_pool: Arc<redis::Client>,
         filter_pool: Arc<Mutex<BTreeMap<U256, FilterPoolItem>>>,
     ) {
-        let mut conn = redis_pool.get().expect("get redis connect");
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let conn = redis_pool.get_connection().expect("get redis connect");
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let mut last_height = getter.latest_height().expect("redis latest_height error");
         let ten_millis = time::Duration::from_millis(100);
         loop {
@@ -123,11 +123,11 @@ impl EthFilterApiImpl {
     }
 
     fn get_block(&self, height: u64) -> Result<Option<Block>> {
-        let mut conn = self
+        let conn = self
             .redis_pool
-            .get()
+            .get_connection()
             .map_err(|e| internal_err(e.to_string()))?;
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let hash = match getter
             .get_block_hash_by_height(U256::from(height))
             .map_err(|e| internal_err(e.to_string()))?
@@ -142,11 +142,11 @@ impl EthFilterApiImpl {
             .map_err(|e| internal_err(e.to_string()))
     }
     fn get_transaction_statuses(&self, height: u64) -> Result<Option<Vec<TransactionStatus>>> {
-        let mut conn = self
+        let conn = self
             .redis_pool
-            .get()
+            .get_connection()
             .map_err(|e| internal_err(e.to_string()))?;
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let hash = match getter
             .get_block_hash_by_height(U256::from(height))
             .map_err(|e| internal_err(e.to_string()))?

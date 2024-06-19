@@ -5,8 +5,8 @@ use {
     redis_versioned_kv::VersionedKVCommand,
 };
 
-trait Getter {
-    fn new(conn: ConnectionType, something: String) -> Result<Self>
+pub trait Getter {
+    fn new(conn: ConnectionType, something: String) -> Self
     where
         Self: std::marker::Sized;
     fn latest_height(&mut self) -> Result<u32>;
@@ -37,17 +37,17 @@ trait Getter {
     fn get_allowances(&mut self, height: u32, owner: H160, spender: H160) -> Result<U256>;
 }
 
-struct RedisGetter {
+pub struct RedisGetter {
     conn: Connection,
     pub prefix: String,
 }
 
 impl Getter for RedisGetter {
-    fn new(connection: ConnectionType, prefix: String) -> Result<Self> {
+    fn new(connection: ConnectionType, prefix: String) -> Self {
         if let ConnectionType::Redis(conn) = connection {
-            Ok(Self { conn, prefix })
+            Self { conn, prefix }
         } else {
-            Err(Error::Others("Invalid connection type for Redis".into()))
+            panic!("Invalid connection type for Redis")
         }
     }
 
