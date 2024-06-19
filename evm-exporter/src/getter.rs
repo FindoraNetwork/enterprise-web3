@@ -1,8 +1,9 @@
 use {
-    crate::{keys, AccountBasic, Block, ConnectionType, Error, Receipt, Result, TransactionStatus},
+    crate::{keys, AccountBasic, Block, ConnectionType, Receipt, Result, TransactionStatus},
     primitive_types::{H160, H256, U256},
     redis::{Commands, Connection},
     redis_versioned_kv::VersionedKVCommand,
+    sqlx::PgConnection,
 };
 
 pub trait Getter {
@@ -35,6 +36,90 @@ pub trait Getter {
     fn get_pending_state(&mut self, address: H160, index: H256) -> Result<Option<H256>>;
     fn get_total_issuance(&mut self, height: u32) -> Result<U256>;
     fn get_allowances(&mut self, height: u32, owner: H160, spender: H160) -> Result<U256>;
+}
+
+pub struct PgGetter {
+    conn: PgConnection,
+}
+
+impl Getter for PgGetter {
+    fn new(connection: ConnectionType, _something: String) -> Self {
+        if let ConnectionType::Postgres(conn) = connection {
+            Self { conn }
+        } else {
+            panic!("Invalid connection type for Postgres")
+        }
+    }
+    fn latest_height(&mut self) -> Result<u32> {
+        Ok(0)
+    }
+    fn lowest_height(&mut self) -> Result<u32> {
+        Ok(0)
+    }
+    fn get_balance(&mut self, height: u32, address: H160) -> Result<U256> {
+        Ok(U256::zero())
+    }
+    fn get_nonce(&mut self, height: u32, address: H160) -> Result<U256> {
+        Ok(U256::zero())
+    }
+    fn get_byte_code(&mut self, height: u32, address: H160) -> Result<Vec<u8>> {
+        Ok(vec![0])
+    }
+    fn get_account_basic(&mut self, height: u32, address: H160) -> Result<AccountBasic> {
+        Ok(AccountBasic {
+            balance: self.get_balance(height, address)?,
+            code: self.get_byte_code(height, address)?,
+            nonce: self.get_nonce(height, address)?,
+        })
+    }
+    fn addr_state_exists(&mut self, height: u32, address: H160) -> Result<bool> {
+        Ok(true)
+    }
+    fn get_state(&mut self, height: u32, address: H160, index: H256) -> Result<H256> {
+        Ok(H256::zero())
+    }
+    fn get_block_hash_by_height(&mut self, height: U256) -> Result<Option<H256>> {
+        Ok(Some(H256::zero()))
+    }
+    fn get_height_by_block_hash(&mut self, block_hash: H256) -> Result<Option<U256>> {
+        Ok(Some(U256::zero()))
+    }
+    fn get_block_by_hash(&mut self, block_hash: H256) -> Result<Option<Block>> {
+        Ok(None)
+    }
+    fn get_transaction_receipt_by_block_hash(
+        &mut self,
+        block_hash: H256,
+    ) -> Result<Option<Vec<Receipt>>> {
+        Ok(None)
+    }
+    fn get_transaction_status_by_block_hash(
+        &mut self,
+        block_hash: H256,
+    ) -> Result<Option<Vec<TransactionStatus>>> {
+        Ok(None)
+    }
+    fn get_transaction_index_by_tx_hash(&mut self, tx_hash: H256) -> Result<Option<(H256, u32)>> {
+        Ok(None)
+    }
+    fn get_pending_balance(&mut self, address: H160) -> Result<Option<U256>> {
+        Ok(Some(U256::zero()))
+    }
+    fn get_pending_nonce(&mut self, address: H160) -> Result<Option<U256>> {
+        Ok(Some(U256::zero()))
+    }
+    fn get_pending_byte_code(&mut self, address: H160) -> Result<Option<Vec<u8>>> {
+        Ok(None)
+    }
+    fn get_pending_state(&mut self, address: H160, index: H256) -> Result<Option<H256>> {
+        Ok(Some(H256::zero()))
+    }
+    fn get_total_issuance(&mut self, height: u32) -> Result<U256> {
+        Ok(U256::zero())
+    }
+    fn get_allowances(&mut self, height: u32, owner: H160, spender: H160) -> Result<U256> {
+        Ok(U256::zero())
+    }
 }
 
 pub struct RedisGetter {

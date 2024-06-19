@@ -17,5 +17,5 @@ pub use utils::*;
 
 pub enum ConnectionType {
     Redis(redis::Connection),
-    // Postgres(PgConnection),
+    Postgres(sqlx::PgConnection),
 }

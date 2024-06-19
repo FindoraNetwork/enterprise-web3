@@ -10,6 +10,7 @@ use {
     primitive_types::{H160, H256, U256},
     redis::{Commands, Connection},
     redis_versioned_kv::VersionedKVCommand,
+    sqlx::PgConnection,
 };
 
 pub trait Setter {
@@ -25,11 +26,8 @@ pub trait Setter {
     fn remove_nonce(&mut self, height: u32, address: H160) -> Result<()>;
     fn set_byte_code(&mut self, height: u32, address: H160, code: Vec<u8>) -> Result<()>;
     fn remove_byte_code(&mut self, height: u32, address: H160) -> Result<()>;
-
     fn set_state(&mut self, height: u32, address: H160, index: H256, value: H256) -> Result<()>;
-
     fn remove_state(&mut self, height: u32, address: H160, index: H256) -> Result<()>;
-
     fn set_block_info(
         &mut self,
         block: Block,
@@ -51,6 +49,94 @@ pub trait Setter {
         spender: H160,
         value: U256,
     ) -> Result<()>;
+}
+
+pub struct PgSetter {
+    conn: PgConnection,
+}
+
+impl Setter for PgSetter {
+    fn new(connection: ConnectionType, _something: String) -> Self {
+        if let ConnectionType::Postgres(conn) = connection {
+            Self { conn }
+        } else {
+            panic!("Invalid connection type for Postgres")
+        }
+    }
+    fn clear(&mut self) -> Result<()> {
+        Ok(())
+    }
+    fn set_height(&mut self, height: u32) -> Result<()> {
+        Ok(())
+    }
+    fn set_lowest_height(&mut self, height: u32) -> Result<()> {
+        Ok(())
+    }
+    fn set_balance(&mut self, height: u32, address: H160, balance: U256) -> Result<()> {
+        Ok(())
+    }
+    fn remove_balance(&mut self, height: u32, address: H160) -> Result<()> {
+        Ok(())
+    }
+    fn set_nonce(&mut self, height: u32, address: H160, nonce: U256) -> Result<()> {
+        Ok(())
+    }
+    fn remove_nonce(&mut self, height: u32, address: H160) -> Result<()> {
+        Ok(())
+    }
+    fn set_byte_code(&mut self, height: u32, address: H160, code: Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+    fn remove_byte_code(&mut self, height: u32, address: H160) -> Result<()> {
+        Ok(())
+    }
+    fn set_state(&mut self, height: u32, address: H160, index: H256, value: H256) -> Result<()> {
+        Ok(())
+    }
+    fn remove_state(&mut self, height: u32, address: H160, index: H256) -> Result<()> {
+        Ok(())
+    }
+    fn set_block_info(
+        &mut self,
+        block: Block,
+        receipts: Vec<Receipt>,
+        statuses: Vec<TransactionStatus>,
+    ) -> Result<()> {
+        Ok(())
+    }
+    fn remove_block_info(&mut self, height: U256) -> Result<()> {
+        Ok(())
+    }
+    fn set_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()> {
+        Ok(())
+    }
+    fn set_pending_code(&mut self, address: H160, code: Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+    fn set_pending_state(&mut self, address: H160, index: H256, value: H256) -> Result<()> {
+        Ok(())
+    }
+    fn remove_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()> {
+        Ok(())
+    }
+    fn remove_pending_code(&mut self, address: H160) -> Result<()> {
+        Ok(())
+    }
+    fn remove_pending_state(&mut self, address: H160, index: H256) -> Result<()> {
+        Ok(())
+    }
+    fn set_total_issuance(&mut self, height: u32, value: U256) -> Result<()> {
+        Ok(())
+    }
+    fn set_allowances(
+        &mut self,
+        height: u32,
+        owner: H160,
+        spender: H160,
+        value: U256,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub struct RedisSetter {
