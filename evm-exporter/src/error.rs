@@ -6,6 +6,9 @@ pub enum Error {
     RedisError(#[from] redis::RedisError),
 
     #[error(transparent)]
+    PostgresError(#[from] sqlx::Error),
+
+    #[error(transparent)]
     FromHexError(#[from] hex::FromHexError),
 
     #[error(transparent)]
