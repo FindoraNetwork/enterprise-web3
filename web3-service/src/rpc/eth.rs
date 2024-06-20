@@ -14,7 +14,7 @@ use {
         executor::stack::{StackExecutor, StackSubstateMetadata},
         {ExitError, ExitReason},
     },
-    evm_exporter::{public_key, Getter, TransactionStatus, PREFIX},
+    evm_exporter::{public_key, ConnectionType, Getter, RedisGetter, TransactionStatus, PREFIX},
     jsonrpc_core::{futures::future, BoxFuture, Error, ErrorCode, Result, Value},
     lazy_static::lazy_static,
     sha3::{Digest, Keccak256},
@@ -42,7 +42,7 @@ lazy_static! {
 pub struct EthService {
     chain_id: u32,
     gas_price: u64,
-    pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
+    pool: Arc<redis::cluster::ClusterClient>,
     tm_client: Arc<HttpClient>,
     tendermint_url: String,
 }
@@ -50,7 +50,7 @@ pub struct EthService {
 pub struct EthService {
     chain_id: u32,
     gas_price: u64,
-    pool: Arc<r2d2::Pool<redis::Client>>,
+    pool: Arc<redis::Client>,
     tm_client: Arc<HttpClient>,
     tendermint_url: String,
 }
@@ -60,7 +60,7 @@ impl EthService {
     pub fn new(
         chain_id: u32,
         gas_price: u64,
-        pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
+        pool: Arc<redis::cluster::ClusterClient>,
         tm_client: Arc<HttpClient>,
         tendermint_url: &str,
     ) -> Self {
@@ -76,7 +76,7 @@ impl EthService {
     pub fn new(
         chain_id: u32,
         gas_price: u64,
-        pool: Arc<r2d2::Pool<redis::Client>>,
+        pool: Arc<redis::Client>,
         tm_client: Arc<HttpClient>,
         tendermint_url: &str,
     ) -> Self {
@@ -254,7 +254,7 @@ impl EthApi for EthService {
 
     fn balance(&self, address: H160, number: Option<BlockNumber>) -> BoxFuture<Result<U256>> {
         log::info!(target: "eth api", "balance address:{:?} number:{:?}", &address, &number);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -264,7 +264,7 @@ impl EthApi for EthService {
             }
         };
 
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
         if let Some(BlockNumber::Pending) = number {
             match getter.get_pending_balance(address) {
@@ -310,7 +310,7 @@ impl EthApi for EthService {
 
     fn call(&self, request: CallRequest, number: Option<BlockNumber>) -> BoxFuture<Result<Bytes>> {
         log::info!(target: "eth api", "call request:{:?} number:{:?}", &request, &number);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -319,7 +319,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
         let is_pending = matches!(number, Some(BlockNumber::Pending));
 
@@ -382,7 +382,7 @@ impl EthApi for EthService {
 
     fn author(&self) -> BoxFuture<Result<H160>> {
         log::info!(target: "eth api", "author");
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -391,7 +391,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
         let height = match getter.latest_height() {
             Ok(h) => h,
@@ -448,7 +448,7 @@ impl EthApi for EthService {
 
     fn block_number(&self) -> BoxFuture<Result<U256>> {
         log::info!(target: "eth api", "block_number");
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -457,7 +457,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
         match getter.latest_height() {
             Ok(height) => Box::pin(future::ok(U256::from(height))),
@@ -475,7 +475,7 @@ impl EthApi for EthService {
         number: Option<BlockNumber>,
     ) -> BoxFuture<Result<H256>> {
         log::info!(target: "eth api", "storage_at address:{:?} index:{:?} number:{:?}", &address, &index, &number);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -484,7 +484,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         if let Some(BlockNumber::Pending) = number {
             match getter.get_pending_state(address, H256::from_uint(&index)) {
                 Ok(value) => {
@@ -520,7 +520,7 @@ impl EthApi for EthService {
 
     fn block_by_hash(&self, hash: H256, full: bool) -> BoxFuture<Result<Option<RichBlock>>> {
         log::info!(target: "eth api", "block_by_hash hash:{:?} full:{:?}", &hash, &full);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -529,7 +529,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
         let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
@@ -574,7 +574,7 @@ impl EthApi for EthService {
         full: bool,
     ) -> BoxFuture<Result<Option<RichBlock>>> {
         log::info!(target: "eth api", "block_by_number number:{:?} full:{:?}", &number, &full);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -583,7 +583,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
         let height = match block_number_to_height(Some(number), &mut getter) {
             Ok(h) => h,
@@ -653,7 +653,7 @@ impl EthApi for EthService {
         number: Option<BlockNumber>,
     ) -> BoxFuture<Result<U256>> {
         log::info!(target: "eth api", "transaction_count address:{:?} number:{:?}", &address, &number);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -662,7 +662,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         if let Some(BlockNumber::Pending) = number {
             match getter.get_pending_nonce(address) {
                 Ok(nonce) => {
@@ -698,7 +698,7 @@ impl EthApi for EthService {
 
     fn block_transaction_count_by_hash(&self, hash: H256) -> BoxFuture<Result<Option<U256>>> {
         log::info!(target: "eth api", "block_transaction_count_by_hash hash:{:?}", &hash);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -707,7 +707,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
@@ -731,7 +731,7 @@ impl EthApi for EthService {
         number: BlockNumber,
     ) -> BoxFuture<Result<Option<U256>>> {
         log::info!(target: "eth api", "block_transaction_count_by_number number:{:?}", &number);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -740,7 +740,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
         let height = match block_number_to_height(Some(number), &mut getter) {
             Ok(h) => h,
@@ -801,7 +801,7 @@ impl EthApi for EthService {
         if address == H160::from_low_u64_be(0x1000) {
             return Box::pin(future::ok(Bytes::new(b"fra".to_vec())));
         }
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -810,7 +810,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         if let Some(BlockNumber::Pending) = number {
             match getter.get_pending_byte_code(address) {
                 Ok(byte_code) => {
@@ -902,7 +902,7 @@ impl EthApi for EthService {
         number: Option<BlockNumber>,
     ) -> BoxFuture<Result<U256>> {
         log::info!(target: "eth api", "estimate_gas request:{:?} number:{:?}", &request, &number);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -911,7 +911,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let is_pending = matches!(number, Some(BlockNumber::Pending));
 
         let height = match block_number_to_height(number, &mut getter) {
@@ -1074,7 +1074,7 @@ impl EthApi for EthService {
 
     fn transaction_by_hash(&self, tx_hash: H256) -> BoxFuture<Result<Option<Transaction>>> {
         log::info!(target: "eth api", "transaction_by_hash tx_hash:{:?}", &tx_hash);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -1083,7 +1083,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let (hash, index) = match getter.get_transaction_index_by_tx_hash(tx_hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
@@ -1152,7 +1152,7 @@ impl EthApi for EthService {
         index: Index,
     ) -> BoxFuture<Result<Option<Transaction>>> {
         log::info!(target: "eth api", "transaction_by_block_hash_and_index hash:{:?} index:{:?}", &hash, &index);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -1161,7 +1161,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let block = match getter.get_block_by_hash(hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
@@ -1215,7 +1215,7 @@ impl EthApi for EthService {
         index: Index,
     ) -> BoxFuture<Result<Option<Transaction>>> {
         log::info!(target: "eth api", "transaction_by_block_number_and_index number:{:?} index:{:?}", &number, &index);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -1224,7 +1224,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
         let height = match block_number_to_height(Some(number), &mut getter) {
             Ok(h) => h,
@@ -1300,7 +1300,7 @@ impl EthApi for EthService {
 
     fn transaction_receipt(&self, tx_hash: H256) -> BoxFuture<Result<Option<Receipt>>> {
         log::info!(target: "eth api", "transaction_receipt tx_hash:{:?}", &tx_hash);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -1309,7 +1309,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let (hash, index) = match getter.get_transaction_index_by_tx_hash(tx_hash) {
             Ok(value) => {
                 if let Some(hash_index) = value {
@@ -1464,7 +1464,7 @@ impl EthApi for EthService {
 
     fn logs(&self, filter: Filter) -> BoxFuture<Result<Vec<Log>>> {
         log::info!(target: "eth api", "logs filter:{:?}", &filter);
-        let mut conn = match self.pool.get() {
+        let conn = match self.pool.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
                 return Box::pin(future::err(internal_err(format!(
@@ -1473,7 +1473,7 @@ impl EthApi for EthService {
                 ))));
             }
         };
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
         let mut ret: Vec<Log> = Vec::new();
         if let Some(block_hash) = filter.block_hash {

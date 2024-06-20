@@ -1,8 +1,8 @@
-use {evm_exporter::Getter, redis::ConnectionLike, ruc::*, web3_rpc_core::types::BlockNumber};
+use {evm_exporter::Getter, ruc::*, web3_rpc_core::types::BlockNumber};
 
-pub fn block_number_to_height<C: ConnectionLike>(
+pub fn block_number_to_height(
     block_number: Option<BlockNumber>,
-    getter: &mut Getter<C>,
+    getter: &mut dyn Getter,
 ) -> Result<u32> {
     let height = match block_number.unwrap_or(BlockNumber::Latest) {
         BlockNumber::Hash {

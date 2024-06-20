@@ -1,4 +1,5 @@
 use boa_engine::Context;
+use evm_exporter::{ConnectionType, RedisGetter};
 
 use {
     super::{
@@ -32,7 +33,7 @@ use {
 pub struct DebugApiImpl {
     chain_id: u32,
     gas_price: u64,
-    pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
+    pool: Arc<redis::cluster::ClusterClient>,
     mutex: Mutex<bool>,
     tendermint_url: String,
 }
@@ -40,7 +41,7 @@ pub struct DebugApiImpl {
 pub struct DebugApiImpl {
     chain_id: u32,
     gas_price: u64,
-    pool: Arc<r2d2::Pool<redis::Client>>,
+    pool: Arc<redis::Client>,
     mutex: Mutex<bool>,
     tendermint_url: String,
 }
@@ -49,7 +50,7 @@ impl DebugApiImpl {
     pub fn new(
         chain_id: u32,
         gas_price: u64,
-        pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
+        pool: Arc<redis::cluster::ClusterClient>,
         tendermint_url: &str,
     ) -> Self {
         Self {
@@ -63,7 +64,7 @@ impl DebugApiImpl {
     pub fn new(
         chain_id: u32,
         gas_price: u64,
-        pool: Arc<r2d2::Pool<redis::Client>>,
+        pool: Arc<redis::Client>,
         tendermint_url: &str,
     ) -> Self {
         Self {
@@ -224,12 +225,12 @@ impl DebugApi for DebugApiImpl {
         number: BlockNumber,
         params: Option<TraceParams>,
     ) -> Result<Vec<Value>> {
-        let mut conn = self.pool.get().map_err(|e| {
+        let conn = self.pool.get_connection().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
             err
         })?;
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let height = match block_number_to_height(Some(number), &mut getter) {
             Ok(h) => h,
             Err(e) => {
@@ -263,12 +264,12 @@ impl DebugApi for DebugApiImpl {
         params: Option<TraceParams>,
     ) -> Result<Vec<Value>> {
         log::info!(target: "debug api", "trace_transaction block_hash:{:?}  ", block_hash);
-        let mut conn = self.pool.get().map_err(|e| {
+        let conn = self.pool.get_connection().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
             err
         })?;
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let block = getter
             .get_block_by_hash(block_hash)
             .map_err(|e| {
@@ -369,12 +370,12 @@ impl DebugApi for DebugApiImpl {
         params: Option<TraceParams>,
     ) -> Result<Value> {
         log::info!(target: "debug api", "trace_transaction number:{:?} request:{:?} ", number,request);
-        let mut conn = self.pool.get().map_err(|e| {
+        let conn = self.pool.get_connection().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
             err
         })?;
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let height = block_number_to_height(Some(number), &mut getter).map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
@@ -410,12 +411,12 @@ impl DebugApi for DebugApiImpl {
 
     fn trace_transaction(&self, tx_hash: H256, params: Option<TraceParams>) -> Result<Value> {
         log::info!(target: "debug api", "trace_transaction tx_hash:{:?}", tx_hash);
-        let mut conn = self.pool.get().map_err(|e| {
+        let conn = self.pool.get_connection().map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
             err
         })?;
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let (block_hash, index) = getter
             .get_transaction_index_by_tx_hash(tx_hash)
             .map_err(|e| {

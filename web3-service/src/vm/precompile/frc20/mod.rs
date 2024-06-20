@@ -10,7 +10,7 @@ use {
         executor::stack::{PrecompileFailure, PrecompileOutput},
         Context, ExitSucceed,
     },
-    evm_exporter::{Getter, PREFIX},
+    evm_exporter::{ConnectionType, Getter, RedisGetter, PREFIX},
     evm_runtime::ExitError,
     log::debug,
     slices::u8_slice,
@@ -88,16 +88,16 @@ impl FRC20 {
         0x1000
     }
     fn get_balance(&self, addr: H160) -> EvmResult<U256> {
-        let mut conn = REDIS_POOL
+        let conn = REDIS_POOL
             .get()
             .ok_or_else(|| ExitError::Other(Cow::from("REDIS_POOL get error")))
             .and_then(|redis_pool| {
-                redis_pool.get().map_err(|e| {
+                redis_pool.get_connection().map_err(|e| {
                     ExitError::Other(Cow::from(format!("redis get connect error:{:?}", e)))
                 })
             })?;
 
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let amount = getter
             .get_balance(self.height, addr)
             .map_err(|e| ExitError::Other(Cow::from(format!("redis get value error:{:?}", e))))?;
@@ -107,16 +107,16 @@ impl FRC20 {
     }
 
     fn get_allowance(&self, owner: H160, spender: H160) -> EvmResult<U256> {
-        let mut conn = REDIS_POOL
+        let conn = REDIS_POOL
             .get()
             .ok_or_else(|| ExitError::Other(Cow::from("REDIS_POOL get error")))
             .and_then(|redis_pool| {
-                redis_pool.get().map_err(|e| {
+                redis_pool.get_connection().map_err(|e| {
                     ExitError::Other(Cow::from(format!("redis get connect error:{:?}", e)))
                 })
             })?;
 
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let amount = getter
             .get_allowances(self.height, owner, spender)
             .map_err(|e| ExitError::Other(Cow::from(format!("redis get value error:{:?}", e))))?;
@@ -257,16 +257,16 @@ impl FRC20 {
         gasometer.record_cost(GAS_TOTAL_SUPPLY)?;
 
         input.expect_arguments(0)?;
-        let mut conn = REDIS_POOL
+        let conn = REDIS_POOL
             .get()
             .ok_or_else(|| ExitError::Other(Cow::from("REDIS_POOL get error")))
             .and_then(|redis_pool| {
-                redis_pool.get().map_err(|e| {
+                redis_pool.get_connection().map_err(|e| {
                     ExitError::Other(Cow::from(format!("redis get connect error:{:?}", e)))
                 })
             })?;
 
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         let amount: U256 = getter
             .get_total_issuance(self.height)
             .map_err(|e| ExitError::Other(Cow::from(format!("redis get value error:{:?}", e))))?;

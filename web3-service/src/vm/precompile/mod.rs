@@ -22,16 +22,15 @@ use {
     identity::Identity,
     modexp::Modexp,
     once_cell::sync::{Lazy, OnceCell},
-    r2d2::Pool,
     ripemd160_precompile::Ripemd160,
     ruc::*,
     sha256::Sha256,
     std::{collections::BTreeMap, sync::Arc},
 };
 #[cfg(feature = "cluster_redis")]
-pub static REDIS_POOL: OnceCell<Arc<Pool<redis::cluster::ClusterClient>>> = OnceCell::new();
+pub static REDIS_POOL: OnceCell<Arc<redis::cluster::ClusterClient>> = OnceCell::new();
 #[cfg(not(feature = "cluster_redis"))]
-pub static REDIS_POOL: OnceCell<Arc<Pool<redis::Client>>> = OnceCell::new();
+pub static REDIS_POOL: OnceCell<Arc<redis::Client>> = OnceCell::new();
 
 pub type PrecompileResult = core::result::Result<PrecompileOutput, PrecompileFailure>;
 

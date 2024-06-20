@@ -5,7 +5,7 @@ use {
         backend::{Backend, Basic},
         executor::stack::{Accessed, StackState, StackSubstateMetadata},
     },
-    evm_exporter::{Getter, PREFIX},
+    evm_exporter::{ConnectionType, Getter, RedisGetter, PREFIX},
     jsonrpc_core::Value,
     ruc::{d, eg, RucResult},
     std::{
@@ -22,7 +22,7 @@ pub struct Web3EvmStackstate<'config> {
     chain_id: u32,
     height: u32,
     origin: H160,
-    pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
+    pool: Arc<redis::cluster::ClusterClient>,
     tendermint_url: String,
     metadata: StackSubstateMetadata<'config>,
     deletes: BTreeSet<H160>,
@@ -39,7 +39,7 @@ pub struct Web3EvmStackstate<'config> {
     height: u32,
     is_pending: bool,
     origin: H160,
-    pool: Arc<r2d2::Pool<redis::Client>>,
+    pool: Arc<redis::Client>,
     tendermint_url: String,
     metadata: StackSubstateMetadata<'config>,
     deletes: BTreeSet<H160>,
@@ -58,7 +58,7 @@ impl<'config> Web3EvmStackstate<'config> {
         height: u32,
         is_pending: bool,
         origin: H160,
-        pool: Arc<r2d2::Pool<redis::cluster::ClusterClient>>,
+        pool: Arc<redis::cluster::ClusterClient>,
         tendermint_url: &str,
         metadata: StackSubstateMetadata<'config>,
     ) -> Self {
@@ -87,7 +87,7 @@ impl<'config> Web3EvmStackstate<'config> {
         height: u32,
         is_pending: bool,
         origin: H160,
-        pool: Arc<r2d2::Pool<redis::Client>>,
+        pool: Arc<redis::Client>,
         tendermint_url: &str,
         metadata: StackSubstateMetadata<'config>,
     ) -> Self {
@@ -131,8 +131,9 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
     fn block_hash(&self, height: U256) -> H256 {
         let func = || -> ruc::Result<H256> {
-            let mut conn = self.pool.get().c(d!())?;
-            let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+            let conn = self.pool.get_connection().c(d!())?;
+            let mut getter: RedisGetter =
+                Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
             getter
                 .get_block_hash_by_height(height)
                 .c(d!())?
@@ -143,8 +144,9 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
     fn block_number(&self) -> U256 {
         let func = || -> ruc::Result<U256> {
-            let mut conn = self.pool.get().c(d!())?;
-            let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+            let conn = self.pool.get_connection().c(d!())?;
+            let mut getter: RedisGetter =
+                Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
             getter.latest_height().c(d!()).map(U256::from)
         };
         func().unwrap_or_default()
@@ -174,8 +176,9 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
     fn block_timestamp(&self) -> U256 {
         let func = || -> ruc::Result<U256> {
-            let mut conn = self.pool.get().c(d!())?;
-            let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+            let conn = self.pool.get_connection().c(d!())?;
+            let mut getter: RedisGetter =
+                Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
             let block_hash = getter
                 .get_block_hash_by_height(U256::from(self.height))
                 .c(d!())?
@@ -191,8 +194,9 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
     fn block_difficulty(&self) -> U256 {
         let func = || -> ruc::Result<U256> {
-            let mut conn = self.pool.get().c(d!())?;
-            let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+            let conn = self.pool.get_connection().c(d!())?;
+            let mut getter: RedisGetter =
+                Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
             let block_hash = getter
                 .get_block_hash_by_height(U256::from(self.height))
                 .c(d!())?
@@ -208,8 +212,9 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
     fn block_gas_limit(&self) -> U256 {
         let func = || -> ruc::Result<U256> {
-            let mut conn = self.pool.get().c(d!())?;
-            let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+            let conn = self.pool.get_connection().c(d!())?;
+            let mut getter: RedisGetter =
+                Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
             let block_hash = getter
                 .get_block_hash_by_height(U256::from(self.height))
                 .c(d!())?
@@ -233,8 +238,9 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
     fn exists(&self, address: H160) -> bool {
         let func = || -> ruc::Result<bool> {
-            let mut conn = self.pool.get().c(d!())?;
-            let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+            let conn = self.pool.get_connection().c(d!())?;
+            let mut getter: RedisGetter =
+                Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
             let balance = getter.get_balance(self.height, address).c(d!())?;
             let nonce = getter.get_nonce(self.height, address).c(d!())?;
             Ok(nonce != U256::zero() && balance != U256::zero())
@@ -244,8 +250,9 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
 
     fn basic(&self, address: H160) -> Basic {
         let func = || -> ruc::Result<Basic> {
-            let mut conn = self.pool.get().c(d!())?;
-            let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+            let conn = self.pool.get_connection().c(d!())?;
+            let mut getter: RedisGetter =
+                Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
             let balance = if self.is_pending {
                 getter
@@ -275,8 +282,9 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
             return value.to_vec();
         }
         let func = || -> ruc::Result<Vec<u8>> {
-            let mut conn = self.pool.get().c(d!())?;
-            let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+            let conn = self.pool.get_connection().c(d!())?;
+            let mut getter: RedisGetter =
+                Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
             Ok(if self.is_pending {
                 getter
@@ -296,8 +304,9 @@ impl<'config> Backend for Web3EvmStackstate<'config> {
         }
 
         let func = || -> ruc::Result<H256> {
-            let mut conn = self.pool.get().c(d!())?;
-            let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+            let conn = self.pool.get_connection().c(d!())?;
+            let mut getter: RedisGetter =
+                Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
             Ok(if self.is_pending {
                 getter
@@ -396,8 +405,9 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
 
     fn is_empty(&self, address: H160) -> bool {
         let func = || -> ruc::Result<bool> {
-            let mut conn = self.pool.get().c(d!())?;
-            let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+            let conn = self.pool.get_connection().c(d!())?;
+            let mut getter: RedisGetter =
+                Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
             let balance = getter.get_balance(self.height, address).c(d!())?;
             let nonce = getter.get_nonce(self.height, address).c(d!())?;
             let code = getter.get_byte_code(self.height, address).c(d!())?;
@@ -459,11 +469,11 @@ impl<'config> StackState<'config> for Web3EvmStackstate<'config> {
     }
 
     fn transfer(&mut self, transfer: evm::Transfer) -> Result<(), evm::ExitError> {
-        let mut conn = self
+        let conn = self
             .pool
-            .get()
+            .get_connection()
             .map_err(|_| evm::ExitError::Other(Cow::from("redis connect error")))?;
-        let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
 
         let default_source_balance = getter
             .get_balance(self.height, transfer.source)

@@ -7,15 +7,15 @@ use {
     chrono::{DateTime, UTC},
     ethereum_types::{H160, H256, U256},
     evm::Opcode,
-    evm_exporter::{Getter, PREFIX},
+    evm_exporter::{ConnectionType, Getter, RedisGetter, PREFIX},
     once_cell::sync::OnceCell,
     ruc::{eg, Result as RucResult},
     std::{str::FromStr, sync::Arc},
 };
-static REDIS_POOL: OnceCell<Arc<r2d2::Pool<redis::Client>>> = OnceCell::new();
+static REDIS_POOL: OnceCell<Arc<redis::Client>> = OnceCell::new();
 
 #[inline(always)]
-pub fn init_upstream(redis_pool: Arc<r2d2::Pool<redis::Client>>) -> RucResult<()> {
+pub fn init_upstream(redis_pool: Arc<redis::Client>) -> RucResult<()> {
     REDIS_POOL.set(redis_pool).map_err(|_| eg!())
 }
 
@@ -909,9 +909,10 @@ impl DB {
         })?;
         if let Some(pool) = REDIS_POOL.get().as_ref() {
             let info = pool
-                .get()
-                .map(|mut conn| {
-                    let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+                .get_connection()
+                .map(|conn| {
+                    let mut getter: RedisGetter =
+                        Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
                     match getter.get_balance(height, address) {
                         Ok(b) => b,
                         _ => U256::zero(),
@@ -953,9 +954,10 @@ impl DB {
         })?;
         if let Some(pool) = REDIS_POOL.get().as_ref() {
             let info = pool
-                .get()
-                .map(|mut conn| {
-                    let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+                .get_connection()
+                .map(|conn| {
+                    let mut getter: RedisGetter =
+                        Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
                     match getter.get_nonce(height, address) {
                         Ok(b) => b,
                         _ => U256::zero(),
@@ -997,9 +999,10 @@ impl DB {
         })?;
         if let Some(pool) = REDIS_POOL.get().as_ref() {
             let info = pool
-                .get()
-                .map(|mut conn| {
-                    let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+                .get_connection()
+                .map(|conn| {
+                    let mut getter: RedisGetter =
+                        Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
                     match getter.get_byte_code(height, address) {
                         Ok(b) => b,
                         _ => vec![],
@@ -1068,9 +1071,10 @@ impl DB {
         })?;
         if let Some(pool) = REDIS_POOL.get().as_ref() {
             let info = pool
-                .get()
-                .map(|mut conn| {
-                    let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+                .get_connection()
+                .map(|conn| {
+                    let mut getter: RedisGetter =
+                        Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
                     match getter.get_state(height, address, index) {
                         Ok(b) => b,
                         _ => H256::zero(),
@@ -1114,9 +1118,10 @@ impl DB {
         })?;
         if let Some(pool) = REDIS_POOL.get().as_ref() {
             let info = pool
-                .get()
-                .map(|mut conn| {
-                    let mut getter = Getter::new(&mut *conn, PREFIX.to_string());
+                .get_connection()
+                .map(|conn| {
+                    let mut getter: RedisGetter =
+                        Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
                     match getter.addr_state_exists(height, address) {
                         Ok(b) => b,
                         _ => false,
