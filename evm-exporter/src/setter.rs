@@ -7,10 +7,11 @@ use {
         ConnectionType, Receipt,
     },
     ethereum::LegacyTransaction,
-    postgres::{Client, GenericClient},
+    postgres::Client,
     primitive_types::{H160, H256, U256},
     redis::{Commands, Connection},
-    redis_versioned_kv::VersionedKVCommand,
+    redis_versioned_kv::VersionedKVCommand, 
+    std::str::FromStr,
 };
 
 pub trait Setter {
