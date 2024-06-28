@@ -6,7 +6,7 @@ pub enum Error {
     RedisError(#[from] redis::RedisError),
 
     #[error(transparent)]
-    PostgresError(#[from] sqlx::Error),
+    PostgresError(#[from] postgres::Error),
 
     #[error(transparent)]
     FromHexError(#[from] hex::FromHexError),
@@ -28,6 +28,12 @@ pub enum Error {
 
     #[error(transparent)]
     Libsecp256k1Error(#[from] libsecp256k1::Error),
+
+    #[error(transparent)]
+    UTypeConvertError(#[from] uint::FromHexError),
+
+    #[error(transparent)]
+    HTypeConvertError(#[from] fixed_hash::rustc_hex::FromHexError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

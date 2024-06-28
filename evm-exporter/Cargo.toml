@@ -6,15 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-primitive-types = "0.11.1"
+primitive-types = "0.11"
 thiserror = "1.0.34"
 ethereum-types = { version = "0.13.1", default-features = false, features = ["serialize"] }
-sqlx = { version = "0.7", default-features = false, features = ["postgres", "time", "bigdecimal"] }
+postgres = { version = "0.19", features = ["array-impls"] }
 redis = { version = "0.25", default-features = false }
 redis-versioned-kv = { path = "../redis-versioned-kv" }
 hex = "0.4.3"
 uint = "0.9.3"
 sha3 = "0.8"
+fixed-hash = "0.8"
 libsecp256k1 = { version = "0.5", features = ["static-context", "hmac"] }
 ethereum = { version = "0.12.0", default-features = false, features = ["with-serde"] }
 serde = { version = "1.0", features = ["derive"] }

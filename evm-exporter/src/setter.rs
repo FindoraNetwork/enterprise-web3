@@ -7,10 +7,10 @@ use {
         ConnectionType, Receipt,
     },
     ethereum::LegacyTransaction,
+    postgres::{Client, GenericClient},
     primitive_types::{H160, H256, U256},
     redis::{Commands, Connection},
     redis_versioned_kv::VersionedKVCommand,
-    sqlx::PgConnection,
 };
 
 pub trait Setter {
@@ -52,7 +52,7 @@ pub trait Setter {
 }
 
 pub struct PgSetter {
-    conn: PgConnection,
+    conn: Client,
 }
 
 impl Setter for PgSetter {
@@ -64,36 +64,93 @@ impl Setter for PgSetter {
         }
     }
     fn clear(&mut self) -> Result<()> {
+        self.conn.execute(
+            r"TRUNCATE
+             allowances,
+             block_info,
+             common,
+             nonce,
+             pending_state,
+             state,
+             balance,
+             byte_code,
+             issuance,
+             pending_byte_code,
+             pending_transactions,
+             transactions",
+            &[],
+        )?;
         Ok(())
     }
     fn set_height(&mut self, height: u32) -> Result<()> {
+        self.conn
+            .execute("UPDATE common set latest_height = $1", &[&height])?;
         Ok(())
     }
     fn set_lowest_height(&mut self, height: u32) -> Result<()> {
+        self.conn
+            .execute("UPDATE common set lowest_height = $1", &[&height])?;
         Ok(())
     }
     fn set_balance(&mut self, height: u32, address: H160, balance: U256) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO balance(balance, address, height) VALUES($1, $2, $3)",
+            &[&balance.to_string(), &address.to_string(), &height],
+        )?;
         Ok(())
     }
     fn remove_balance(&mut self, height: u32, address: H160) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM balance WHERE height = $1 AND address = $2",
+            &[&height, &address.to_string()],
+        )?;
         Ok(())
     }
     fn set_nonce(&mut self, height: u32, address: H160, nonce: U256) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO nonce(nonce, address, height) VALUES($1, $2, $3)",
+            &[&nonce.to_string(), &address.to_string(), &height],
+        )?;
         Ok(())
     }
     fn remove_nonce(&mut self, height: u32, address: H160) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM nonce WHERE height = $1 AND address = $2",
+            &[&height, &address.to_string()],
+        )?;
         Ok(())
     }
     fn set_byte_code(&mut self, height: u32, address: H160, code: Vec<u8>) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO byte_code(code, address, height) VALUES($1, $2, $3)",
+            &[&hex::encode(code), &address.to_string(), &height],
+        )?;
         Ok(())
     }
     fn remove_byte_code(&mut self, height: u32, address: H160) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM byte_code WHERE height = $1 AND address = $2",
+            &[&height, &address.to_string()],
+        )?;
         Ok(())
     }
     fn set_state(&mut self, height: u32, address: H160, index: H256, value: H256) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO state(value, idx, address, height) VALUES($1, $2, $3, $4)",
+            &[
+                &value.to_string(),
+                &index.to_string(),
+                &address.to_string(),
+                &height,
+            ],
+        )?;
         Ok(())
     }
     fn remove_state(&mut self, height: u32, address: H160, index: H256) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM state WHERE height = $1 AND address = $2 AND idx = $3",
+            &[&height, &address.to_string(), &index.to_string()],
+        )?;
         Ok(())
     }
     fn set_block_info(
@@ -102,30 +159,106 @@ impl Setter for PgSetter {
         receipts: Vec<Receipt>,
         statuses: Vec<TransactionStatus>,
     ) -> Result<()> {
+        self.conn.execute(
+            r"INSERT INTO block_info(block_hash, block_height, block, receipt, statuses) 
+            VALUES($1, $2, $3, $4, $5)",
+            &[
+                &block.header.hash().to_string(),
+                &block.header.number.to_string(),
+                &serde_json::to_string(&block)?,
+                &serde_json::to_string(&receipts)?,
+                &serde_json::to_string(&statuses)?,
+            ],
+        )?;
+
+        for (i, tx) in statuses.iter().enumerate() {
+            self.conn.execute(
+                "INSERT INTO transactions(transaction_hash, transaction_index) VALUES($1, $2))",
+                &[
+                    &tx.transaction_hash.to_string(),
+                    &serde_json::to_string(&(block.header.hash().to_string(), i as u32))?,
+                ],
+            )?;
+        }
         Ok(())
     }
-    fn remove_block_info(&mut self, height: U256) -> Result<()> {
+    fn remove_block_info(&mut self, block_height: U256) -> Result<()> {
+        let row: String = self
+            .conn
+            .query_one(
+                "SELECT statuses FROM block_info WHERE block_height = $1",
+                &[&block_height.to_string()],
+            )?
+            .get("statuses");
+        let statuses: Vec<TransactionStatus> = serde_json::from_str(&row)?;
+
+        self.conn.execute(
+            "DELETE FROM block_info WHERE block_height = $1",
+            &[&block_height.to_string()],
+        )?;
+
+        for tx in statuses {
+            self.conn.execute(
+                "DELETE FROM transactions WHERE transaction_hash = $1",
+                &[&tx.transaction_hash.to_string()],
+            )?;
+        }
+
         Ok(())
     }
     fn set_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()> {
+        let sign_address = recover_signer(&transaction)?;
+        let latest_height: u32 = self
+            .conn
+            .query_one("SELECT latest_height FROM common", &[])?
+            .get("latest_height");
+        let balance = U256::from_str(
+            self.conn
+                .query_one(
+                    "SELECT balance FROM balance WHERE address = $1 AND height = $2",
+                    &[&sign_address.to_string(), &latest_height],
+                )?
+                .get("balance"),
+        )?;
+
+        self.conn.execute(
+            "INSERT INTO pending_transactions(sign_address, pending_balance, pending_nonce) VALUES($1, $2, $3)",
+            &[
+                &sign_address.to_string(),
+                &balance.saturating_sub(transaction.value.saturating_add(transaction.gas_price.saturating_mul(transaction.gas_limit))).to_string(),
+                &transaction.nonce.to_string(),
+            ],
+            
+        )?;
         Ok(())
     }
     fn set_pending_code(&mut self, address: H160, code: Vec<u8>) -> Result<()> {
+        self.conn.execute("INSERT INTO pending_byte_code(code, address) VALUES($1, $2)", 
+            &[&serde_json::to_string(&code)?, &address.to_string()],
+        )?;
         Ok(())
     }
     fn set_pending_state(&mut self, address: H160, index: H256, value: H256) -> Result<()> {
+        self.conn.execute("INSERT INTO pending_state(value, idx, address) VALUES($1, $2, $3)", 
+            &[&value.to_string(), &index.to_string(), &address.to_string()],
+        )?;
         Ok(())
     }
     fn remove_pending_tx(&mut self, transaction: LegacyTransaction) -> Result<()> {
+        let sign_address = recover_signer(&transaction)?;
+        self.conn.execute("DELETE FROM pending_transactions WHERE sign_address = $1", &[&sign_address.to_string()])?;
         Ok(())
     }
     fn remove_pending_code(&mut self, address: H160) -> Result<()> {
+        self.conn.execute("DELETE FROM pending_byte_code WHERE address = $1", &[&address.to_string()])?;
         Ok(())
     }
     fn remove_pending_state(&mut self, address: H160, index: H256) -> Result<()> {
+        self.conn.execute("DELETE FROM pending_state WHERE address = $1 AND idx = $2", &[&address.to_string(), &index.to_string()])?;
         Ok(())
     }
     fn set_total_issuance(&mut self, height: u32, value: U256) -> Result<()> {
+        self.conn.execute("INSERT INTO issuance(value, height) VALUES($1, $2)", &[&value.to_string(), &height])?;
         Ok(())
     }
     fn set_allowances(
@@ -135,6 +268,9 @@ impl Setter for PgSetter {
         spender: H160,
         value: U256,
     ) -> Result<()> {
+        self.conn.execute("INSERT INTO allowances(owner, spender, value, height) VALUES($1, $2, $3, $4)", 
+            &[&owner.to_string(), &spender.to_string(), &value.to_string(),&height],
+        )?;
         Ok(())
     }
 }

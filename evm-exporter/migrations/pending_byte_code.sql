@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS pending_byte_code (
     id BIGSERIAL PRIMARY KEY,
-    code TEXT NOT NULL,
+    code JSONB NOT NULL,
     address CHARACTER VARYING(64) NOT NULL,
 );
 

@@ -1,9 +1,10 @@
 use {
     crate::{keys, AccountBasic, Block, ConnectionType, Receipt, Result, TransactionStatus},
+    postgres::Client,
     primitive_types::{H160, H256, U256},
     redis::{Commands, Connection},
     redis_versioned_kv::VersionedKVCommand,
-    sqlx::PgConnection,
+    std::str::FromStr,
 };
 
 pub trait Getter {
@@ -39,7 +40,7 @@ pub trait Getter {
 }
 
 pub struct PgGetter {
-    conn: PgConnection,
+    conn: Client,
 }
 
 impl Getter for PgGetter {
@@ -51,19 +52,46 @@ impl Getter for PgGetter {
         }
     }
     fn latest_height(&mut self) -> Result<u32> {
-        Ok(0)
+        Ok(self
+            .conn
+            .query_one("SELECT latest_height FROM common", &[])?
+            .get("latest_height"))
     }
     fn lowest_height(&mut self) -> Result<u32> {
-        Ok(0)
+        Ok(self
+            .conn
+            .query_one("SELECT lowest_height FROM common", &[])?
+            .get("lowest_height"))
     }
     fn get_balance(&mut self, height: u32, address: H160) -> Result<U256> {
-        Ok(U256::zero())
+        Ok(U256::from_str(
+            self.conn
+                .query_one(
+                    "SELECT balance FROM balance WHERE address = $1 AND height = $2",
+                    &[&address.to_string(), &height],
+                )?
+                .get("balance"),
+        )?)
     }
     fn get_nonce(&mut self, height: u32, address: H160) -> Result<U256> {
-        Ok(U256::zero())
+        Ok(U256::from_str(
+            self.conn
+                .query_one(
+                    "SELECT nonce FROM nonce WHERE address = $1 AND height = $2",
+                    &[&address.to_string(), &height],
+                )?
+                .get("nonce"),
+        )?)
     }
     fn get_byte_code(&mut self, height: u32, address: H160) -> Result<Vec<u8>> {
-        Ok(vec![0])
+        Ok(hex::decode::<Vec<u8>>(
+            self.conn
+                .query_one(
+                    "SELECT code FROM byte_code WHERE address = $1 AND height = $2",
+                    &[&address.to_string(), &height],
+                )?
+                .get("code"),
+        )?)
     }
     fn get_account_basic(&mut self, height: u32, address: H160) -> Result<AccountBasic> {
         Ok(AccountBasic {
@@ -73,52 +101,143 @@ impl Getter for PgGetter {
         })
     }
     fn addr_state_exists(&mut self, height: u32, address: H160) -> Result<bool> {
-        Ok(true)
+        Ok(!self
+            .conn
+            .query_one(
+                "SELECT 1 FROM state WHERE address = $1 AND height = $2",
+                &[&address.to_string(), &height],
+            )?
+            .is_empty())
     }
     fn get_state(&mut self, height: u32, address: H160, index: H256) -> Result<H256> {
-        Ok(H256::zero())
+        Ok(H256::from_str(
+            self.conn
+                .query_one(
+                    "SELECT value FROM state WHERE idx = $1 AND address = $2 AND height = $3",
+                    &[&index.to_string(), &address.to_string(), &height],
+                )?
+                .get("value"),
+        )?)
     }
     fn get_block_hash_by_height(&mut self, height: U256) -> Result<Option<H256>> {
-        Ok(Some(H256::zero()))
+        Ok(Some(H256::from_str(
+            self.conn
+                .query_one(
+                    "SELECT block_hash FROM block_info WHERE block_height = $1",
+                    &[&height.to_string()],
+                )?
+                .get("block_hash"),
+        )?))
     }
     fn get_height_by_block_hash(&mut self, block_hash: H256) -> Result<Option<U256>> {
-        Ok(Some(U256::zero()))
+        Ok(Some(U256::from_str(
+            self.conn
+                .query_one(
+                    "SELECT block_height FROM block_info WHERE block_hash = $1",
+                    &[&block_hash.to_string()],
+                )?
+                .get("block_height"),
+        )?))
     }
     fn get_block_by_hash(&mut self, block_hash: H256) -> Result<Option<Block>> {
-        Ok(None)
+        Ok(Some(serde_json::from_str(
+            self.conn
+                .query_one(
+                    "SELECT block FROM block_info WHERE block_hash = $1",
+                    &[&block_hash.to_string()],
+                )?
+                .get("block"),
+        )?))
     }
     fn get_transaction_receipt_by_block_hash(
         &mut self,
         block_hash: H256,
     ) -> Result<Option<Vec<Receipt>>> {
-        Ok(None)
+        Ok(Some(serde_json::from_str(
+            self.conn
+                .query_one(
+                    "SELECT receipt FROM block_info WHERE block_hash = $1",
+                    &[&block_hash.to_string()],
+                )?
+                .get("receipt"),
+        )?))
     }
     fn get_transaction_status_by_block_hash(
         &mut self,
         block_hash: H256,
     ) -> Result<Option<Vec<TransactionStatus>>> {
-        Ok(None)
+        Ok(Some(serde_json::from_str(
+            self.conn
+                .query_one(
+                    "SELECT statuses FROM block_info WHERE block_hash = $1",
+                    &[&block_hash.to_string()],
+                )?
+                .get("statuses"),
+        )?))
     }
     fn get_transaction_index_by_tx_hash(&mut self, tx_hash: H256) -> Result<Option<(H256, u32)>> {
-        Ok(None)
+        Ok(Some(serde_json::from_str(
+            self.conn
+                .query_one(
+                    "SELECT transaction_index FROM transactions WHERE transaction_hash = $1",
+                    &[&tx_hash.to_string()],
+                )?
+                .get("transaction_index"),
+        )?))
     }
     fn get_pending_balance(&mut self, address: H160) -> Result<Option<U256>> {
-        Ok(Some(U256::zero()))
+        Ok(Some(U256::from_str(
+            self.conn
+                .query_one(
+                    "SELECT pending_balance FROM pending_transactions WHERE sign_address = $1",
+                    &[&address.to_string()],
+                )?
+                .get("pending_balance"),
+        )?))
     }
     fn get_pending_nonce(&mut self, address: H160) -> Result<Option<U256>> {
-        Ok(Some(U256::zero()))
+        Ok(Some(U256::from_str(
+            self.conn
+                .query_one(
+                    "SELECT pending_nonce FROM pending_transactions WHERE sign_address = $1",
+                    &[&address.to_string()],
+                )?
+                .get("pending_nonce"),
+        )?))
     }
     fn get_pending_byte_code(&mut self, address: H160) -> Result<Option<Vec<u8>>> {
-        Ok(None)
+        Ok(Some(serde_json::from_str(
+            self.conn
+                .query_one(
+                    "SELECT code FROM pending_byte_code WHERE address = $1",
+                    &[&address.to_string()],
+                )?
+                .get("code"),
+        )?))
     }
     fn get_pending_state(&mut self, address: H160, index: H256) -> Result<Option<H256>> {
-        Ok(Some(H256::zero()))
+        Ok(Some(H256::from_str(
+            self.conn
+                .query_one(
+                    "SELECT value FROM pending_state WHERE address = $1 AND idx = $2",
+                    &[&address.to_string(), &index.to_string()],
+                )?
+                .get("value"),
+        )?))
     }
     fn get_total_issuance(&mut self, height: u32) -> Result<U256> {
-        Ok(U256::zero())
+        Ok(U256::from_str(
+            self.conn
+                .query_one("SELECT value FROM issuance WHERE height = $1", &[&height])?
+                .get("value"),
+        )?)
     }
     fn get_allowances(&mut self, height: u32, owner: H160, spender: H160) -> Result<U256> {
-        Ok(U256::zero())
+        Ok(U256::from_str(
+            self.conn
+                .query_one("SELECT value FROM allowances WHERE owner = $1 AND spender = $2 AND height = $3", &[&owner.to_string(),&spender.to_string(),&height])?
+                .get("value"),
+        )?)
     }
 }
 
