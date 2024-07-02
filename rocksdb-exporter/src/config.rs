@@ -10,6 +10,7 @@ pub struct Config {
     pub history_db_path: String,
     pub redis_url: Vec<String>,
     pub clear: bool,
+    pub postgres_uri: String,
 }
 
 impl Config {
