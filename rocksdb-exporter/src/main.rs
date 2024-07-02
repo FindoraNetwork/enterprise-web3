@@ -20,22 +20,42 @@ fn main() {
     let hisdb = Arc::new(pnk!(RocksDB::open(config.history_db_path.as_str())));
 
     #[cfg(feature = "cluster_redis")]
-    let client = pnk!(redis::cluster::ClusterClient::open(
-        config.redis_url.clone()
-    ));
-    #[cfg(not(feature = "cluster_redis"))]
-    let client = pnk!(redis::Client::open(config.redis_url[0].as_ref()));
+    let mut setter = Setter::new(
+        ConnectionType::RedisCluster(&config.redis_url),
+        PREFIX.to_string(),
+    );
+    #[cfg(feature = "cluster_redis")]
+    let mut getter = Getter::new(
+        ConnectionType::RedisCluster(&config.redis_url),
+        PREFIX.to_string(),
+    );
+    #[cfg(feature = "redis")]
+    let mut setter = Setter::new(
+        ConnectionType::Redis(&config.redis_url[0]),
+        PREFIX.to_string(),
+    );
+    #[cfg(feature = "redis")]
+    let mut getter = Getter::new(
+        ConnectionType::Redis(&config.redis_url[0]),
+        PREFIX.to_string(),
+    );
+    #[cfg(feature = "postgres")]
+    let mut setter = Setter::new(
+        ConnectionType::Postgres(&config.postgres_uri),
+        String::new(),
+    );
+    #[cfg(feature = "postgres")]
+    let mut getter = Getter::new(
+        ConnectionType::Postgres(&config.postgres_uri),
+        String::new(),
+    );
 
-    let conn = pnk!(client.get_connection());
-    let mut setter: RedisSetter = Setter::new(ConnectionType::Redis(conn), PREFIX.to_string());
     let current_height = pnk!(get_current_height(&hisdb));
 
     let mut height = if config.clear {
         pnk!(setter.clear());
         U256::zero()
     } else {
-        let conn = pnk!(client.get_connection());
-        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         U256::from(pnk!(getter.latest_height()))
     };
 

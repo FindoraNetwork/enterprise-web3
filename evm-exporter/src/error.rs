@@ -2,9 +2,11 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[cfg(any(feature = "redis", feature = "redis-cluster"))]
     #[error(transparent)]
     RedisError(#[from] redis::RedisError),
 
+    #[cfg(feature = "postgres")]
     #[error(transparent)]
     PostgresError(#[from] postgres::Error),
 
