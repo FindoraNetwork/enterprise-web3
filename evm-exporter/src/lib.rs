@@ -15,11 +15,11 @@ pub use setter::*;
 mod utils;
 pub use utils::*;
 
-pub enum ConnectionType<'a> {
+pub enum ConnectionType {
     #[cfg(feature = "redis")]
-    Redis(&'a str),
+    Redis(String),
     #[cfg(feature = "redis-cluster")]
-    RedisCluster(&'a [&'a str]),
+    RedisCluster(Vec<String>),
     #[cfg(feature = "postgres")]
-    Postgres(&'a str),
+    Postgres(String),
 }

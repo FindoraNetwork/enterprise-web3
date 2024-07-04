@@ -1,5 +1,4 @@
 use boa_engine::Context;
-use evm_exporter::{ConnectionType, RedisGetter};
 
 use {
     super::{
@@ -23,58 +22,36 @@ use {
         CreateScheme::Legacy,
         ExitError, ExitReason,
     },
-    evm_exporter::{Getter, PREFIX},
+    evm_exporter::Getter,
     jsonrpc_core::{Error, Result, Value},
     std::sync::{Arc, Mutex},
     web3_rpc_core::types::{BlockNumber, CallRequest},
 };
 
-#[cfg(feature = "cluster_redis")]
 pub struct DebugApiImpl {
     chain_id: u32,
     gas_price: u64,
-    pool: Arc<redis::cluster::ClusterClient>,
+    getter: Arc<dyn Getter + Send + Sync>,
     mutex: Mutex<bool>,
     tendermint_url: String,
 }
-#[cfg(not(feature = "cluster_redis"))]
-pub struct DebugApiImpl {
-    chain_id: u32,
-    gas_price: u64,
-    pool: Arc<redis::Client>,
-    mutex: Mutex<bool>,
-    tendermint_url: String,
-}
+
 impl DebugApiImpl {
-    #[cfg(feature = "cluster_redis")]
     pub fn new(
         chain_id: u32,
         gas_price: u64,
-        pool: Arc<redis::cluster::ClusterClient>,
+        getter: Arc<dyn Getter + Send + Sync>,
         tendermint_url: &str,
     ) -> Self {
         Self {
             chain_id,
             gas_price,
-            pool,
-            tendermint_url: tendermint_url.into(),
-        }
-    }
-    #[cfg(not(feature = "cluster_redis"))]
-    pub fn new(
-        chain_id: u32,
-        gas_price: u64,
-        pool: Arc<redis::Client>,
-        tendermint_url: &str,
-    ) -> Self {
-        Self {
-            chain_id,
-            gas_price,
-            pool,
+            getter,
             mutex: Mutex::new(true),
             tendermint_url: tendermint_url.into(),
         }
     }
+
     #[allow(clippy::too_many_arguments)]
     fn trace_evm(
         &self,
@@ -109,7 +86,7 @@ impl DebugApiImpl {
                 height,
                 false,
                 from,
-                self.pool.clone(),
+                self.getter.clone(),
                 self.tendermint_url.as_str(),
                 metadata,
             ),
@@ -225,13 +202,7 @@ impl DebugApi for DebugApiImpl {
         number: BlockNumber,
         params: Option<TraceParams>,
     ) -> Result<Vec<Value>> {
-        let conn = self.pool.get_connection().map_err(|e| {
-            let mut err = Error::internal_error();
-            err.message = format!("{:?}", e);
-            err
-        })?;
-        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-        let height = match block_number_to_height(Some(number), &mut getter) {
+        let height = match block_number_to_height(Some(number), self.getter.clone()) {
             Ok(h) => h,
             Err(e) => {
                 return Err(internal_err(format!(
@@ -240,7 +211,7 @@ impl DebugApi for DebugApiImpl {
                 )));
             }
         };
-        let block_hash = match getter.get_block_hash_by_height(U256::from(height)) {
+        let block_hash = match self.getter.get_block_hash_by_height(U256::from(height)) {
             Ok(value) => {
                 if let Some(hash) = value {
                     hash
@@ -264,13 +235,8 @@ impl DebugApi for DebugApiImpl {
         params: Option<TraceParams>,
     ) -> Result<Vec<Value>> {
         log::info!(target: "debug api", "trace_transaction block_hash:{:?}  ", block_hash);
-        let conn = self.pool.get_connection().map_err(|e| {
-            let mut err = Error::internal_error();
-            err.message = format!("{:?}", e);
-            err
-        })?;
-        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-        let block = getter
+        let block = self
+            .getter
             .get_block_by_hash(block_hash)
             .map_err(|e| {
                 let mut err = Error::internal_error();
@@ -282,7 +248,8 @@ impl DebugApi for DebugApiImpl {
                 err.message = "get_block_by_hash value is none".to_string();
                 err
             })?;
-        let transaction_statuses = getter
+        let transaction_statuses = self
+            .getter
             .get_transaction_status_by_block_hash(block_hash)
             .map_err(|e| {
                 let mut err = Error::internal_error();
@@ -370,13 +337,7 @@ impl DebugApi for DebugApiImpl {
         params: Option<TraceParams>,
     ) -> Result<Value> {
         log::info!(target: "debug api", "trace_transaction number:{:?} request:{:?} ", number,request);
-        let conn = self.pool.get_connection().map_err(|e| {
-            let mut err = Error::internal_error();
-            err.message = format!("{:?}", e);
-            err
-        })?;
-        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-        let height = block_number_to_height(Some(number), &mut getter).map_err(|e| {
+        let height = block_number_to_height(Some(number), self.getter.clone()).map_err(|e| {
             let mut err = Error::internal_error();
             err.message = format!("{:?}", e);
             err
@@ -411,13 +372,8 @@ impl DebugApi for DebugApiImpl {
 
     fn trace_transaction(&self, tx_hash: H256, params: Option<TraceParams>) -> Result<Value> {
         log::info!(target: "debug api", "trace_transaction tx_hash:{:?}", tx_hash);
-        let conn = self.pool.get_connection().map_err(|e| {
-            let mut err = Error::internal_error();
-            err.message = format!("{:?}", e);
-            err
-        })?;
-        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-        let (block_hash, index) = getter
+        let (block_hash, index) = self
+            .getter
             .get_transaction_index_by_tx_hash(tx_hash)
             .map_err(|e| {
                 let mut err = Error::internal_error();
@@ -429,7 +385,8 @@ impl DebugApi for DebugApiImpl {
                 err.message = "get_transaction_index_by_tx_hash value is none".to_string();
                 err
             })?;
-        let block = getter
+        let block = self
+            .getter
             .get_block_by_hash(block_hash)
             .map_err(|e| {
                 let mut err = Error::internal_error();
@@ -441,7 +398,8 @@ impl DebugApi for DebugApiImpl {
                 err.message = "get_block_by_hash value is none".to_string();
                 err
             })?;
-        let statuss = getter
+        let statuss = self
+            .getter
             .get_transaction_status_by_block_hash(block_hash)
             .map_err(|e| {
                 let mut err = Error::internal_error();

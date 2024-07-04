@@ -1,11 +1,12 @@
 use {
-    crate::{keys, AccountBasic, Block, ConnectionType, Receipt, Result, TransactionStatus},
+    crate::{AccountBasic, Block, ConnectionType, Receipt, Result, TransactionStatus},
     primitive_types::{H160, H256, U256},
     std::str::FromStr,
 };
 
 #[cfg(feature = "redis")]
 use {
+    crate::keys,
     redis::{Client as RedisClient, Commands},
     redis_versioned_kv::VersionedKVCommand,
 };
@@ -20,9 +21,6 @@ use {
 };
 
 pub trait Getter {
-    fn new(conn: ConnectionType, something: String) -> Self
-    where
-        Self: std::marker::Sized;
     fn latest_height(&self) -> Result<u32>;
     fn lowest_height(&self) -> Result<u32>;
     fn get_balance(&self, height: u32, address: H160) -> Result<U256>;
@@ -57,8 +55,8 @@ pub struct PgGetter {
 }
 
 #[cfg(feature = "postgres")]
-impl Getter for PgGetter {
-    fn new(connection: ConnectionType, _something: String) -> Self {
+impl PgGetter {
+    pub fn new(connection: ConnectionType, _something: String) -> Self {
         if let ConnectionType::Postgres(uri) = connection {
             let manager = PostgresConnectionManager::new(
                 uri.parse().expect("parse postgres uri failed"),
@@ -70,6 +68,10 @@ impl Getter for PgGetter {
             panic!("Invalid connection type for Postgres")
         }
     }
+}
+
+#[cfg(feature = "postgres")]
+impl Getter for PgGetter {
     fn latest_height(&self) -> Result<u32> {
         Ok(self
             .conn
@@ -286,8 +288,8 @@ pub struct RedisGetter {
 }
 
 #[cfg(feature = "redis")]
-impl Getter for RedisGetter {
-    fn new(connection: ConnectionType, prefix: String) -> Self {
+impl RedisGetter {
+    pub fn new(connection: ConnectionType, prefix: String) -> Self {
         if let ConnectionType::Redis(url) = connection {
             Self {
                 conn: RedisClient::open(url).expect("Connect to Redis failed"),
@@ -297,7 +299,10 @@ impl Getter for RedisGetter {
             panic!("Invalid connection type for Redis")
         }
     }
+}
 
+#[cfg(feature = "redis")]
+impl Getter for RedisGetter {
     fn latest_height(&self) -> Result<u32> {
         let height_key = keys::latest_height_key(&self.prefix);
         let height: Option<String> = self.conn.get_connection()?.get(height_key)?;
@@ -526,8 +531,8 @@ pub struct RedisClusterGetter {
 }
 
 #[cfg(feature = "redis-cluster")]
-impl Getter for RedisClusterGetter {
-    fn new(connection: ConnectionType, prefix: String) -> Self {
+impl RedisClusterGetter {
+    pub fn new(connection: ConnectionType, prefix: String) -> Self {
         if let ConnectionType::RedisCluster(urls) = connection {
             Self {
                 conn: RedisClusterClient::new(urls.to_vec())
@@ -538,7 +543,10 @@ impl Getter for RedisClusterGetter {
             panic!("Invalid connection type for Redis Cluster")
         }
     }
+}
 
+#[cfg(feature = "redis-cluster")]
+impl Getter for RedisClusterGetter {
     fn latest_height(&self) -> Result<u32> {
         let height_key = keys::latest_height_key(&self.prefix);
         let height: Option<String> = self.conn.get_connection()?.get(height_key)?;

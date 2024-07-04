@@ -25,5 +25,5 @@ serde_json = "1.0"
 [features]
 default = ["postgres"]
 redis = ["dep:redis", "dep:redis-versioned-kv"]
-redis-cluster = ["redis/cluster"]
+redis-cluster = ["redis/cluster", "dep:redis", "dep:redis-versioned-kv"]
 postgres = ["dep:r2d2", "dep:r2d2_postgres"]

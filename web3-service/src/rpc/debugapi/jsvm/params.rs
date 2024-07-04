@@ -7,16 +7,17 @@ use {
     chrono::{DateTime, UTC},
     ethereum_types::{H160, H256, U256},
     evm::Opcode,
-    evm_exporter::{ConnectionType, Getter, RedisGetter, PREFIX},
+    evm_exporter::Getter,
     once_cell::sync::OnceCell,
     ruc::{eg, Result as RucResult},
     std::{str::FromStr, sync::Arc},
 };
-static REDIS_POOL: OnceCell<Arc<redis::Client>> = OnceCell::new();
+
+static GETTER: OnceCell<Arc<dyn Getter + Sync + Send>> = OnceCell::new();
 
 #[inline(always)]
-pub fn init_upstream(redis_pool: Arc<redis::Client>) -> RucResult<()> {
-    REDIS_POOL.set(redis_pool).map_err(|_| eg!())
+pub fn init_upstream(getter: Arc<dyn Getter + Sync + Send>) -> RucResult<()> {
+    GETTER.set(getter).map_err(|_| eg!())
 }
 
 pub struct Cfg {
@@ -907,18 +908,11 @@ impl DB {
                 "get_balance from_str error",
             )))
         })?;
-        if let Some(pool) = REDIS_POOL.get().as_ref() {
-            let info = pool
-                .get_connection()
-                .map(|conn| {
-                    let mut getter: RedisGetter =
-                        Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-                    match getter.get_balance(height, address) {
-                        Ok(b) => b,
-                        _ => U256::zero(),
-                    }
-                })
-                .unwrap_or(U256::zero());
+        if let Some(getter) = GETTER.get() {
+            let info = match getter.get_balance(height, address) {
+                Ok(b) => b,
+                _ => U256::zero(),
+            };
             Ok(JsValue::Integer(info.as_usize() as i32))
         } else {
             Ok(JsValue::Integer(0))
@@ -952,18 +946,11 @@ impl DB {
         .map_err(|_| {
             JsError::from_opaque(JsValue::String(JsString::from("get_nonce from_str error")))
         })?;
-        if let Some(pool) = REDIS_POOL.get().as_ref() {
-            let info = pool
-                .get_connection()
-                .map(|conn| {
-                    let mut getter: RedisGetter =
-                        Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-                    match getter.get_nonce(height, address) {
-                        Ok(b) => b,
-                        _ => U256::zero(),
-                    }
-                })
-                .unwrap_or(U256::zero());
+        if let Some(getter) = GETTER.get() {
+            let info = match getter.get_nonce(height, address) {
+                Ok(b) => b,
+                _ => U256::zero(),
+            };
             Ok(JsValue::Integer(info.as_usize() as i32))
         } else {
             Ok(JsValue::Integer(0))
@@ -997,25 +984,18 @@ impl DB {
         .map_err(|_| {
             JsError::from_opaque(JsValue::String(JsString::from("get_code from_str error")))
         })?;
-        if let Some(pool) = REDIS_POOL.get().as_ref() {
-            let info = pool
-                .get_connection()
-                .map(|conn| {
-                    let mut getter: RedisGetter =
-                        Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-                    match getter.get_byte_code(height, address) {
-                        Ok(b) => b,
-                        _ => vec![],
-                    }
-                })
-                .unwrap_or_default();
+        if let Some(getter) = GETTER.get() {
+            let info = match getter.get_byte_code(height, address) {
+                Ok(b) => b,
+                _ => vec![],
+            };
             Ok(JsValue::String(JsString::from(format!(
                 "0x{}",
                 hex::encode(info)
             ))))
         } else {
             Ok(JsValue::String(JsString::from(
-                "get_code REDIS_POOL.get() error",
+                "get_code GETTER.get() error",
             )))
         }
     }
@@ -1069,22 +1049,15 @@ impl DB {
                 "get_state H160 from_str error",
             )))
         })?;
-        if let Some(pool) = REDIS_POOL.get().as_ref() {
-            let info = pool
-                .get_connection()
-                .map(|conn| {
-                    let mut getter: RedisGetter =
-                        Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-                    match getter.get_state(height, address, index) {
-                        Ok(b) => b,
-                        _ => H256::zero(),
-                    }
-                })
-                .unwrap_or(H256::zero());
+        if let Some(getter) = GETTER.get() {
+            let info = match getter.get_state(height, address, index) {
+                Ok(b) => b,
+                _ => H256::zero(),
+            };
             Ok(JsValue::String(JsString::from(format!("{:?}", info))))
         } else {
             Ok(JsValue::String(JsString::from(
-                "get_state REDIS_POOL.get() error",
+                "get_state GETTER.get() error",
             )))
         }
     }
@@ -1116,18 +1089,11 @@ impl DB {
                 "exists H160 from_str error",
             )))
         })?;
-        if let Some(pool) = REDIS_POOL.get().as_ref() {
-            let info = pool
-                .get_connection()
-                .map(|conn| {
-                    let mut getter: RedisGetter =
-                        Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-                    match getter.addr_state_exists(height, address) {
-                        Ok(b) => b,
-                        _ => false,
-                    }
-                })
-                .unwrap_or(false);
+        if let Some(getter) = GETTER.get() {
+            let info = match getter.addr_state_exists(height, address) {
+                Ok(b) => b,
+                _ => false,
+            };
             Ok(JsValue::Boolean(info))
         } else {
             Ok(JsValue::Boolean(false))

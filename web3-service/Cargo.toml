@@ -24,8 +24,6 @@ jsonrpc-core = "18.0"
 jsonrpc-pubsub = "18.0"
 jsonrpc-derive = "18.0"
 
-redis = { version = "0.25", default-features = false, features = [ "tls-native-tls" ] }
-
 attohttpc = { version = "0.18", default-features = false, features = ["compress", "json", "tls-rustls"] }
 tokio = { version = "1.21.0", features = ["full"] }
 env_logger = "0.9.0"
@@ -62,5 +60,7 @@ noah-crypto  = { git = "https://github.com/FindoraNetwork/noah", tag = "v0.4.3-1
 precompile-utils-macro = { path = "src/vm/precompile/frc20/macro" }
 
 [features]
-default = []
-cluster_redis = ["redis/cluster"]
+default = ["postgres"]
+redis-cluster = ["evm-exporter/redis-cluster"]
+redis = ["evm-exporter/redis"]
+postgres = ["evm-exporter/postgres"]

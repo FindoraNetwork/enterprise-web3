@@ -17,6 +17,7 @@ use {
     ecrecover::ECRecover,
     ethereum_types::H160,
     evm::executor::stack::{PrecompileFailure, PrecompileFn, PrecompileOutput, PrecompileSet},
+    evm_exporter::Getter,
     evm_runtime::{Context, ExitError},
     frc20::FRC20,
     identity::Identity,
@@ -27,10 +28,8 @@ use {
     sha256::Sha256,
     std::{collections::BTreeMap, sync::Arc},
 };
-#[cfg(feature = "cluster_redis")]
-pub static REDIS_POOL: OnceCell<Arc<redis::cluster::ClusterClient>> = OnceCell::new();
-#[cfg(not(feature = "cluster_redis"))]
-pub static REDIS_POOL: OnceCell<Arc<redis::Client>> = OnceCell::new();
+
+pub static GETTER: OnceCell<Arc<dyn Getter + Send + Sync>> = OnceCell::new();
 
 pub type PrecompileResult = core::result::Result<PrecompileOutput, PrecompileFailure>;
 

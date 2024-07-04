@@ -1,7 +1,7 @@
 use {
     crate::notify::SubscriberNotify,
     ethereum_types::{H256, U256},
-    evm_exporter::{Block, ConnectionType, Getter, Receipt, RedisGetter, PREFIX},
+    evm_exporter::{Block, Getter, Receipt},
     futures::{
         executor::ThreadPool,
         task::{FutureObj, Spawn, SpawnError},
@@ -37,14 +37,17 @@ impl Spawn for SubscriptionTaskExecutor {
     }
 }
 pub struct EthPubSubApiImpl {
-    redis_pool: Arc<redis::Client>,
+    getter: Arc<dyn Getter + Send + Sync>,
     subscriptions: SubscriptionManager,
     subscriber_notify: Arc<SubscriberNotify>,
 }
 impl EthPubSubApiImpl {
-    pub fn new(redis_pool: Arc<redis::Client>, subscriber_notify: Arc<SubscriberNotify>) -> Self {
+    pub fn new(
+        getter: Arc<dyn Getter + Send + Sync>,
+        subscriber_notify: Arc<SubscriberNotify>,
+    ) -> Self {
         Self {
-            redis_pool,
+            getter,
             subscriptions: SubscriptionManager::new(Arc::new(SubscriptionTaskExecutor)),
             subscriber_notify,
         }
@@ -65,46 +68,41 @@ impl EthPubSubApi for EthPubSubApiImpl {
             Some(Params::Logs(filter)) => FilteredParams::new(Some(filter)),
             _ => FilteredParams::default(),
         };
+        let getter = self.getter.clone();
+
         match kind {
             Kind::Logs => {
-                let redis_pool = self.redis_pool.clone();
-                self.subscriptions.add(subscriber, |sink| {
+                self.subscriptions.add(subscriber, move |sink| {
                     let stream = self
                         .subscriber_notify
                         .logs_event_notify
                         .notification_stream()
                         .filter_map(move |block_height| {
-                            let info = redis_pool.get_connection().map(| conn| {
-                                let mut getter:RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-                                match getter.get_block_hash_by_height(block_height) {
-                                    Ok(Some(hash)) => {
-                                        let block = match getter.get_block_by_hash(hash) {
-                                            Ok(Some(b)) => Some(b),
-                                            _ => None,
-                                        };
-                                        let receipt = match getter.get_transaction_receipt_by_block_hash(hash) {
-                                            Ok(Some(b)) => Some(b),
-                                            _ => None,
-                                        };
-                                        (block,receipt)
-                                    },
-                                    _ => (None, None),
+                            let info = match getter.get_block_hash_by_height(block_height) {
+                                Ok(Some(hash)) => {
+                                    let block = match getter.get_block_by_hash(hash) {
+                                        Ok(Some(b)) => Some(b),
+                                        _ => None,
+                                    };
+                                    let receipt = match getter
+                                        .get_transaction_receipt_by_block_hash(hash)
+                                    {
+                                        Ok(Some(b)) => Some(b),
+                                        _ => None,
+                                    };
+                                    (block, receipt)
                                 }
-                            });
+                                _ => (None, None),
+                            };
                             match info {
-                                Ok((Some(block),Some(receipts))) => {
+                                (Some(block), Some(receipts)) => {
                                     futures::future::ready(Some((block, receipts)))
                                 }
                                 _ => futures::future::ready(None),
                             }
-
                         })
                         .flat_map(move |(block, receipts)| {
-                            futures::stream::iter(logs(
-                                block,
-                                receipts,
-                                &filtered_params,
-                            ))
+                            futures::stream::iter(logs(block, receipts, &filtered_params))
                         })
                         .map(|x| {
                             Ok::<Result<PubSubResult, jsonrpc_core::types::error::Error>, ()>(Ok(
@@ -119,40 +117,28 @@ impl EthPubSubApi for EthPubSubApiImpl {
                 });
             }
             Kind::NewHeads => {
-                let redis_pool = self.redis_pool.clone();
                 self.subscriptions.add(subscriber, move |sink| {
                     let stream = self
                         .subscriber_notify
                         .new_heads_event_notify
                         .notification_stream()
                         .filter_map(move |block_height| {
-                            let block = redis_pool.get_connection().map(| conn|{
-                                let mut getter:RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string()) ;
-                                match getter.get_block_hash_by_height(block_height) {
-                                    Ok(Some(hash)) => {
-                                        match getter.get_block_by_hash(hash) {
-                                            Ok(Some(b)) => Some(b),
-                                            _ => None
-                                        }
-                                    },
-                                    _ => None
-                                }
-                            });
-                            let rich = match block {
-                                Ok(Some(block)) => {
-                                     Some(block_build(block))
+                            let block = match getter.get_block_hash_by_height(block_height) {
+                                Ok(Some(hash)) => match getter.get_block_by_hash(hash) {
+                                    Ok(Some(b)) => Some(b),
+                                    _ => None,
                                 },
-                                _ =>  None,
+                                _ => None,
                             };
-                            futures::future::ready(rich)
+                            futures::future::ready(block.map(block_build))
                         })
                         .map(|header| Ok::<_, ()>(Ok(PubSubResult::Header(Box::new(header)))));
 
-                    stream
-                        .forward(sink.sink_map_err(
-                            |e| log::warn!(target: "eth_rpc", "Error sending notifications: {:?}", e),
-                        ))
-                        .map(|_| ())
+                     stream
+                         .forward(sink.sink_map_err(
+                             |e| log::warn!(target: "eth_rpc", "Error sending notifications: {:?}", e),
+                         ))
+                         .map(|_| ())
                 });
             }
             Kind::NewPendingTransactions => {

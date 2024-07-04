@@ -3,7 +3,7 @@ mod evm_rocksdb_storage;
 
 use {
     config::Config,
-    evm_exporter::{ConnectionType, Getter, RedisGetter, RedisSetter, Setter, PREFIX},
+    evm_exporter::{ConnectionType, Getter, Setter, PREFIX},
     evm_rocksdb_storage::{
         evm_rocksdb::RocksDB, get_account_info, get_block_info, get_current_height,
     },
@@ -19,12 +19,12 @@ fn main() {
     let statedb = Arc::new(pnk!(RocksDB::open(config.state_db_path.as_str())));
     let hisdb = Arc::new(pnk!(RocksDB::open(config.history_db_path.as_str())));
 
-    #[cfg(feature = "cluster_redis")]
+    #[cfg(feature = "redis-cluster")]
     let mut setter = Setter::new(
         ConnectionType::RedisCluster(&config.redis_url),
         PREFIX.to_string(),
     );
-    #[cfg(feature = "cluster_redis")]
+    #[cfg(feature = "redis-cluster")]
     let mut getter = Getter::new(
         ConnectionType::RedisCluster(&config.redis_url),
         PREFIX.to_string(),

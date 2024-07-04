@@ -18,8 +18,6 @@ use ethereum_types::{H160, H256};
 use evm::backend::Log;
 use evm::ExitError;
 
-pub use super::data::{Address, EvmData, EvmDataReader, EvmDataWriter};
-
 /// Alias for Result returning an EVM precompile error.
 pub type EvmResult<T = ()> = Result<T, ExitError>;
 

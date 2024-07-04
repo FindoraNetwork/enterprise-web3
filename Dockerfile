@@ -5,7 +5,7 @@ ENV OPENSSL_LIB_DIR="/usr/lib/x86_64-linux-gnu"
 ENV OPENSSL_INCLUDE_DIR="/usr/include/openssl" 
 COPY . /enterprise-web3
 WORKDIR /enterprise-web3
-RUN cargo build --release
+RUN cargo build --release --features "postgres"
 
 RUN mkdir /enterprise-web3-binaries
 RUN cp target/release/rocksdb-exporter /enterprise-web3-binaries

@@ -12,6 +12,7 @@ pub struct Config {
     pub tendermint_url: String,
     pub chain_id: u32,
     pub gas_price: u64,
+    pub postgres_uri: String,
 }
 
 impl Config {
