@@ -14,71 +14,80 @@ use {
 use redis::cluster::ClusterClient as RedisClusterClient;
 
 #[cfg(feature = "postgres")]
-use postgres::Client as PgClient;
+use {
+    r2d2::Pool,
+    r2d2_postgres::{postgres::NoTls, PostgresConnectionManager},
+};
 
 pub trait Getter {
     fn new(conn: ConnectionType, something: String) -> Self
     where
         Self: std::marker::Sized;
-    fn latest_height(&mut self) -> Result<u32>;
-    fn lowest_height(&mut self) -> Result<u32>;
-    fn get_balance(&mut self, height: u32, address: H160) -> Result<U256>;
-    fn get_nonce(&mut self, height: u32, address: H160) -> Result<U256>;
-    fn get_byte_code(&mut self, height: u32, address: H160) -> Result<Vec<u8>>;
-    fn get_account_basic(&mut self, height: u32, address: H160) -> Result<AccountBasic>;
-    fn addr_state_exists(&mut self, height: u32, address: H160) -> Result<bool>;
-    fn get_state(&mut self, height: u32, address: H160, index: H256) -> Result<H256>;
-    fn get_block_hash_by_height(&mut self, height: U256) -> Result<Option<H256>>;
-    fn get_height_by_block_hash(&mut self, block_hash: H256) -> Result<Option<U256>>;
-    fn get_block_by_hash(&mut self, block_hash: H256) -> Result<Option<Block>>;
+    fn latest_height(&self) -> Result<u32>;
+    fn lowest_height(&self) -> Result<u32>;
+    fn get_balance(&self, height: u32, address: H160) -> Result<U256>;
+    fn get_nonce(&self, height: u32, address: H160) -> Result<U256>;
+    fn get_byte_code(&self, height: u32, address: H160) -> Result<Vec<u8>>;
+    fn get_account_basic(&self, height: u32, address: H160) -> Result<AccountBasic>;
+    fn addr_state_exists(&self, height: u32, address: H160) -> Result<bool>;
+    fn get_state(&self, height: u32, address: H160, index: H256) -> Result<H256>;
+    fn get_block_hash_by_height(&self, height: U256) -> Result<Option<H256>>;
+    fn get_height_by_block_hash(&self, block_hash: H256) -> Result<Option<U256>>;
+    fn get_block_by_hash(&self, block_hash: H256) -> Result<Option<Block>>;
     fn get_transaction_receipt_by_block_hash(
-        &mut self,
+        &self,
         block_hash: H256,
     ) -> Result<Option<Vec<Receipt>>>;
     fn get_transaction_status_by_block_hash(
-        &mut self,
+        &self,
         block_hash: H256,
     ) -> Result<Option<Vec<TransactionStatus>>>;
-    fn get_transaction_index_by_tx_hash(&mut self, tx_hash: H256) -> Result<Option<(H256, u32)>>;
-    fn get_pending_balance(&mut self, address: H160) -> Result<Option<U256>>;
-    fn get_pending_nonce(&mut self, address: H160) -> Result<Option<U256>>;
-    fn get_pending_byte_code(&mut self, address: H160) -> Result<Option<Vec<u8>>>;
-    fn get_pending_state(&mut self, address: H160, index: H256) -> Result<Option<H256>>;
-    fn get_total_issuance(&mut self, height: u32) -> Result<U256>;
-    fn get_allowances(&mut self, height: u32, owner: H160, spender: H160) -> Result<U256>;
+    fn get_transaction_index_by_tx_hash(&self, tx_hash: H256) -> Result<Option<(H256, u32)>>;
+    fn get_pending_balance(&self, address: H160) -> Result<Option<U256>>;
+    fn get_pending_nonce(&self, address: H160) -> Result<Option<U256>>;
+    fn get_pending_byte_code(&self, address: H160) -> Result<Option<Vec<u8>>>;
+    fn get_pending_state(&self, address: H160, index: H256) -> Result<Option<H256>>;
+    fn get_total_issuance(&self, height: u32) -> Result<U256>;
+    fn get_allowances(&self, height: u32, owner: H160, spender: H160) -> Result<U256>;
 }
 
 #[cfg(feature = "postgres")]
 pub struct PgGetter {
-    conn: PgClient,
+    conn: Pool<PostgresConnectionManager<NoTls>>,
 }
 
 #[cfg(feature = "postgres")]
 impl Getter for PgGetter {
     fn new(connection: ConnectionType, _something: String) -> Self {
-        if let ConnectionType::Postgres(url) = connection {
-            Self {
-                conn: PgClient::connect(url, postgres::NoTls).expect("Connect to Postgres failed"),
-            }
+        if let ConnectionType::Postgres(uri) = connection {
+            let manager = PostgresConnectionManager::new(
+                uri.parse().expect("parse postgres uri failed"),
+                NoTls,
+            );
+            let pool = r2d2::Pool::new(manager).expect("new postgres connection pool failed");
+            Self { conn: pool }
         } else {
             panic!("Invalid connection type for Postgres")
         }
     }
-    fn latest_height(&mut self) -> Result<u32> {
+    fn latest_height(&self) -> Result<u32> {
         Ok(self
             .conn
+            .get()?
             .query_one("SELECT latest_height FROM common", &[])?
             .get("latest_height"))
     }
-    fn lowest_height(&mut self) -> Result<u32> {
+    fn lowest_height(&self) -> Result<u32> {
         Ok(self
             .conn
+            .get()?
             .query_one("SELECT lowest_height FROM common", &[])?
             .get("lowest_height"))
     }
-    fn get_balance(&mut self, height: u32, address: H160) -> Result<U256> {
+    fn get_balance(&self, height: u32, address: H160) -> Result<U256> {
         Ok(U256::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT balance FROM balance WHERE address = $1 AND height = $2",
                     &[&address.to_string(), &height],
@@ -86,9 +95,10 @@ impl Getter for PgGetter {
                 .get("balance"),
         )?)
     }
-    fn get_nonce(&mut self, height: u32, address: H160) -> Result<U256> {
+    fn get_nonce(&self, height: u32, address: H160) -> Result<U256> {
         Ok(U256::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT nonce FROM nonce WHERE address = $1 AND height = $2",
                     &[&address.to_string(), &height],
@@ -96,9 +106,10 @@ impl Getter for PgGetter {
                 .get("nonce"),
         )?)
     }
-    fn get_byte_code(&mut self, height: u32, address: H160) -> Result<Vec<u8>> {
+    fn get_byte_code(&self, height: u32, address: H160) -> Result<Vec<u8>> {
         Ok(hex::decode::<Vec<u8>>(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT code FROM byte_code WHERE address = $1 AND height = $2",
                     &[&address.to_string(), &height],
@@ -106,25 +117,27 @@ impl Getter for PgGetter {
                 .get("code"),
         )?)
     }
-    fn get_account_basic(&mut self, height: u32, address: H160) -> Result<AccountBasic> {
+    fn get_account_basic(&self, height: u32, address: H160) -> Result<AccountBasic> {
         Ok(AccountBasic {
             balance: self.get_balance(height, address)?,
             code: self.get_byte_code(height, address)?,
             nonce: self.get_nonce(height, address)?,
         })
     }
-    fn addr_state_exists(&mut self, height: u32, address: H160) -> Result<bool> {
+    fn addr_state_exists(&self, height: u32, address: H160) -> Result<bool> {
         Ok(!self
             .conn
+            .get()?
             .query_one(
                 "SELECT 1 FROM state WHERE address = $1 AND height = $2",
                 &[&address.to_string(), &height],
             )?
             .is_empty())
     }
-    fn get_state(&mut self, height: u32, address: H160, index: H256) -> Result<H256> {
+    fn get_state(&self, height: u32, address: H160, index: H256) -> Result<H256> {
         Ok(H256::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT value FROM state WHERE idx = $1 AND address = $2 AND height = $3",
                     &[&index.to_string(), &address.to_string(), &height],
@@ -132,9 +145,10 @@ impl Getter for PgGetter {
                 .get("value"),
         )?)
     }
-    fn get_block_hash_by_height(&mut self, height: U256) -> Result<Option<H256>> {
+    fn get_block_hash_by_height(&self, height: U256) -> Result<Option<H256>> {
         Ok(Some(H256::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT block_hash FROM block_info WHERE block_height = $1",
                     &[&height.to_string()],
@@ -142,9 +156,10 @@ impl Getter for PgGetter {
                 .get("block_hash"),
         )?))
     }
-    fn get_height_by_block_hash(&mut self, block_hash: H256) -> Result<Option<U256>> {
+    fn get_height_by_block_hash(&self, block_hash: H256) -> Result<Option<U256>> {
         Ok(Some(U256::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT block_height FROM block_info WHERE block_hash = $1",
                     &[&block_hash.to_string()],
@@ -152,9 +167,10 @@ impl Getter for PgGetter {
                 .get("block_height"),
         )?))
     }
-    fn get_block_by_hash(&mut self, block_hash: H256) -> Result<Option<Block>> {
+    fn get_block_by_hash(&self, block_hash: H256) -> Result<Option<Block>> {
         Ok(Some(serde_json::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT block FROM block_info WHERE block_hash = $1",
                     &[&block_hash.to_string()],
@@ -163,11 +179,12 @@ impl Getter for PgGetter {
         )?))
     }
     fn get_transaction_receipt_by_block_hash(
-        &mut self,
+        &self,
         block_hash: H256,
     ) -> Result<Option<Vec<Receipt>>> {
         Ok(Some(serde_json::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT receipt FROM block_info WHERE block_hash = $1",
                     &[&block_hash.to_string()],
@@ -176,11 +193,12 @@ impl Getter for PgGetter {
         )?))
     }
     fn get_transaction_status_by_block_hash(
-        &mut self,
+        &self,
         block_hash: H256,
     ) -> Result<Option<Vec<TransactionStatus>>> {
         Ok(Some(serde_json::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT statuses FROM block_info WHERE block_hash = $1",
                     &[&block_hash.to_string()],
@@ -188,9 +206,10 @@ impl Getter for PgGetter {
                 .get("statuses"),
         )?))
     }
-    fn get_transaction_index_by_tx_hash(&mut self, tx_hash: H256) -> Result<Option<(H256, u32)>> {
+    fn get_transaction_index_by_tx_hash(&self, tx_hash: H256) -> Result<Option<(H256, u32)>> {
         Ok(Some(serde_json::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT transaction_index FROM transactions WHERE transaction_hash = $1",
                     &[&tx_hash.to_string()],
@@ -198,9 +217,10 @@ impl Getter for PgGetter {
                 .get("transaction_index"),
         )?))
     }
-    fn get_pending_balance(&mut self, address: H160) -> Result<Option<U256>> {
+    fn get_pending_balance(&self, address: H160) -> Result<Option<U256>> {
         Ok(Some(U256::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT pending_balance FROM pending_transactions WHERE sign_address = $1",
                     &[&address.to_string()],
@@ -208,9 +228,10 @@ impl Getter for PgGetter {
                 .get("pending_balance"),
         )?))
     }
-    fn get_pending_nonce(&mut self, address: H160) -> Result<Option<U256>> {
+    fn get_pending_nonce(&self, address: H160) -> Result<Option<U256>> {
         Ok(Some(U256::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT pending_nonce FROM pending_transactions WHERE sign_address = $1",
                     &[&address.to_string()],
@@ -218,9 +239,10 @@ impl Getter for PgGetter {
                 .get("pending_nonce"),
         )?))
     }
-    fn get_pending_byte_code(&mut self, address: H160) -> Result<Option<Vec<u8>>> {
+    fn get_pending_byte_code(&self, address: H160) -> Result<Option<Vec<u8>>> {
         Ok(Some(serde_json::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT code FROM pending_byte_code WHERE address = $1",
                     &[&address.to_string()],
@@ -228,9 +250,10 @@ impl Getter for PgGetter {
                 .get("code"),
         )?))
     }
-    fn get_pending_state(&mut self, address: H160, index: H256) -> Result<Option<H256>> {
+    fn get_pending_state(&self, address: H160, index: H256) -> Result<Option<H256>> {
         Ok(Some(H256::from_str(
             self.conn
+                .get()?
                 .query_one(
                     "SELECT value FROM pending_state WHERE address = $1 AND idx = $2",
                     &[&address.to_string(), &index.to_string()],
@@ -238,16 +261,18 @@ impl Getter for PgGetter {
                 .get("value"),
         )?))
     }
-    fn get_total_issuance(&mut self, height: u32) -> Result<U256> {
+    fn get_total_issuance(&self, height: u32) -> Result<U256> {
         Ok(U256::from_str(
             self.conn
+                .get()?
                 .query_one("SELECT value FROM issuance WHERE height = $1", &[&height])?
                 .get("value"),
         )?)
     }
-    fn get_allowances(&mut self, height: u32, owner: H160, spender: H160) -> Result<U256> {
+    fn get_allowances(&self, height: u32, owner: H160, spender: H160) -> Result<U256> {
         Ok(U256::from_str(
             self.conn
+                .get()?
                 .query_one("SELECT value FROM allowances WHERE owner = $1 AND spender = $2 AND height = $3", &[&owner.to_string(),&spender.to_string(),&height])?
                 .get("value"),
         )?)
@@ -273,7 +298,7 @@ impl Getter for RedisGetter {
         }
     }
 
-    fn latest_height(&mut self) -> Result<u32> {
+    fn latest_height(&self) -> Result<u32> {
         let height_key = keys::latest_height_key(&self.prefix);
         let height: Option<String> = self.conn.get_connection()?.get(height_key)?;
         match height {
@@ -281,7 +306,7 @@ impl Getter for RedisGetter {
             _ => Ok(0),
         }
     }
-    fn lowest_height(&mut self) -> Result<u32> {
+    fn lowest_height(&self) -> Result<u32> {
         let height_key = keys::lowest_height_key(&self.prefix);
         let height: Option<String> = self.conn.get_connection()?.get(height_key)?;
         match height {
@@ -289,7 +314,7 @@ impl Getter for RedisGetter {
             _ => Ok(0),
         }
     }
-    fn get_balance(&mut self, height: u32, address: H160) -> Result<U256> {
+    fn get_balance(&self, height: u32, address: H160) -> Result<U256> {
         let balance_key = keys::balance_key(&self.prefix, address);
         let balance: Option<String> = self.conn.get_connection()?.vkv_get(balance_key, height)?;
         let balance = if let Some(s) = balance {
@@ -300,7 +325,7 @@ impl Getter for RedisGetter {
         Ok(balance)
     }
 
-    fn get_nonce(&mut self, height: u32, address: H160) -> Result<U256> {
+    fn get_nonce(&self, height: u32, address: H160) -> Result<U256> {
         let nonce_key = keys::nonce_key(&self.prefix, address);
         let nonce: Option<String> = self.conn.get_connection()?.vkv_get(nonce_key, height)?;
         let nonce = if let Some(s) = nonce {
@@ -311,7 +336,7 @@ impl Getter for RedisGetter {
         Ok(nonce)
     }
 
-    fn get_byte_code(&mut self, height: u32, address: H160) -> Result<Vec<u8>> {
+    fn get_byte_code(&self, height: u32, address: H160) -> Result<Vec<u8>> {
         let code_key = keys::code_key(&self.prefix, address);
         let code: Option<String> = self.conn.get_connection()?.vkv_get(code_key, height)?;
         let code = if let Some(s) = code {
@@ -322,7 +347,7 @@ impl Getter for RedisGetter {
         Ok(code)
     }
 
-    fn get_account_basic(&mut self, height: u32, address: H160) -> Result<AccountBasic> {
+    fn get_account_basic(&self, height: u32, address: H160) -> Result<AccountBasic> {
         Ok(AccountBasic {
             balance: self.get_balance(height, address)?,
             code: self.get_byte_code(height, address)?,
@@ -330,7 +355,7 @@ impl Getter for RedisGetter {
         })
     }
 
-    fn addr_state_exists(&mut self, height: u32, address: H160) -> Result<bool> {
+    fn addr_state_exists(&self, height: u32, address: H160) -> Result<bool> {
         let state_addr_key = keys::state_addr_key(&self.prefix, address);
         let value: Option<String> = self
             .conn
@@ -339,7 +364,7 @@ impl Getter for RedisGetter {
         Ok(value.is_some())
     }
 
-    fn get_state(&mut self, height: u32, address: H160, index: H256) -> Result<H256> {
+    fn get_state(&self, height: u32, address: H160, index: H256) -> Result<H256> {
         let state_key = keys::state_key(&self.prefix, address, index);
         let value: Option<String> = self.conn.get_connection()?.vkv_get(state_key, height)?;
         let val = if let Some(s) = value {
@@ -350,7 +375,7 @@ impl Getter for RedisGetter {
         Ok(val)
     }
 
-    fn get_block_hash_by_height(&mut self, height: U256) -> Result<Option<H256>> {
+    fn get_block_hash_by_height(&self, height: U256) -> Result<Option<H256>> {
         let block_hash_key = keys::block_hash_key(&self.prefix, height);
         let value: Option<String> = self
             .conn
@@ -363,7 +388,7 @@ impl Getter for RedisGetter {
         }
     }
 
-    fn get_height_by_block_hash(&mut self, block_hash: H256) -> Result<Option<U256>> {
+    fn get_height_by_block_hash(&self, block_hash: H256) -> Result<Option<U256>> {
         let block_height_key = keys::block_height_key(&self.prefix, block_hash);
         let value: Option<String> = self
             .conn
@@ -376,7 +401,7 @@ impl Getter for RedisGetter {
         }
     }
 
-    fn get_block_by_hash(&mut self, block_hash: H256) -> Result<Option<Block>> {
+    fn get_block_by_hash(&self, block_hash: H256) -> Result<Option<Block>> {
         let block_key = keys::block_key(&self.prefix, block_hash);
         let value: Option<String> = self
             .conn
@@ -390,7 +415,7 @@ impl Getter for RedisGetter {
     }
 
     fn get_transaction_receipt_by_block_hash(
-        &mut self,
+        &self,
         block_hash: H256,
     ) -> Result<Option<Vec<Receipt>>> {
         let receipt_key = keys::receipt_key(&self.prefix, block_hash);
@@ -403,7 +428,7 @@ impl Getter for RedisGetter {
     }
 
     fn get_transaction_status_by_block_hash(
-        &mut self,
+        &self,
         block_hash: H256,
     ) -> Result<Option<Vec<TransactionStatus>>> {
         let status_key = keys::status_key(&self.prefix, block_hash);
@@ -416,7 +441,7 @@ impl Getter for RedisGetter {
         }
     }
 
-    fn get_transaction_index_by_tx_hash(&mut self, tx_hash: H256) -> Result<Option<(H256, u32)>> {
+    fn get_transaction_index_by_tx_hash(&self, tx_hash: H256) -> Result<Option<(H256, u32)>> {
         let transaction_index_key = keys::transaction_index_key(&self.prefix, tx_hash);
 
         let value: Option<String> = self.conn.get_connection()?.get(transaction_index_key)?;
@@ -427,7 +452,7 @@ impl Getter for RedisGetter {
         }
     }
 
-    fn get_pending_balance(&mut self, address: H160) -> Result<Option<U256>> {
+    fn get_pending_balance(&self, address: H160) -> Result<Option<U256>> {
         let balance_key = keys::pending_balance_key(&self.prefix, address);
         let balance: Option<String> = self.conn.get_connection()?.get(balance_key)?;
         let balance = if let Some(s) = balance {
@@ -438,7 +463,7 @@ impl Getter for RedisGetter {
         Ok(balance)
     }
 
-    fn get_pending_nonce(&mut self, address: H160) -> Result<Option<U256>> {
+    fn get_pending_nonce(&self, address: H160) -> Result<Option<U256>> {
         let nonce_key = keys::pending_nonce_key(&self.prefix, address);
         let nonce: Option<String> = self.conn.get_connection()?.get(nonce_key)?;
         let nonce = if let Some(s) = nonce {
@@ -449,7 +474,7 @@ impl Getter for RedisGetter {
         Ok(nonce)
     }
 
-    fn get_pending_byte_code(&mut self, address: H160) -> Result<Option<Vec<u8>>> {
+    fn get_pending_byte_code(&self, address: H160) -> Result<Option<Vec<u8>>> {
         let code_key = keys::pending_code_key(&self.prefix, address);
         let code: Option<String> = self.conn.get_connection()?.get(code_key)?;
         let code = if let Some(s) = code {
@@ -460,7 +485,7 @@ impl Getter for RedisGetter {
         Ok(code)
     }
 
-    fn get_pending_state(&mut self, address: H160, index: H256) -> Result<Option<H256>> {
+    fn get_pending_state(&self, address: H160, index: H256) -> Result<Option<H256>> {
         let state_key = keys::pending_state_key(&self.prefix, address, index);
         let value: Option<String> = self.conn.get_connection()?.get(state_key)?;
         let val = if let Some(s) = value {
@@ -471,7 +496,7 @@ impl Getter for RedisGetter {
         Ok(val)
     }
 
-    fn get_total_issuance(&mut self, height: u32) -> Result<U256> {
+    fn get_total_issuance(&self, height: u32) -> Result<U256> {
         let key = keys::total_issuance_key(&self.prefix);
         let value: Option<String> = self.conn.get_connection()?.vkv_get(key, height)?;
         let val = if let Some(s) = value {
@@ -482,7 +507,7 @@ impl Getter for RedisGetter {
         Ok(val)
     }
 
-    fn get_allowances(&mut self, height: u32, owner: H160, spender: H160) -> Result<U256> {
+    fn get_allowances(&self, height: u32, owner: H160, spender: H160) -> Result<U256> {
         let key = keys::allowances_key(&self.prefix, owner, spender);
         let value: Option<String> = self.conn.get_connection()?.vkv_get(key, height)?;
         let val = if let Some(s) = value {
@@ -514,7 +539,7 @@ impl Getter for RedisClusterGetter {
         }
     }
 
-    fn latest_height(&mut self) -> Result<u32> {
+    fn latest_height(&self) -> Result<u32> {
         let height_key = keys::latest_height_key(&self.prefix);
         let height: Option<String> = self.conn.get_connection()?.get(height_key)?;
         match height {
@@ -522,7 +547,7 @@ impl Getter for RedisClusterGetter {
             _ => Ok(0),
         }
     }
-    fn lowest_height(&mut self) -> Result<u32> {
+    fn lowest_height(&self) -> Result<u32> {
         let height_key = keys::lowest_height_key(&self.prefix);
         let height: Option<String> = self.conn.get_connection()?.get(height_key)?;
         match height {
@@ -530,7 +555,7 @@ impl Getter for RedisClusterGetter {
             _ => Ok(0),
         }
     }
-    fn get_balance(&mut self, height: u32, address: H160) -> Result<U256> {
+    fn get_balance(&self, height: u32, address: H160) -> Result<U256> {
         let balance_key = keys::balance_key(&self.prefix, address);
         let balance: Option<String> = self.conn.get_connection()?.vkv_get(balance_key, height)?;
         let balance = if let Some(s) = balance {
@@ -541,7 +566,7 @@ impl Getter for RedisClusterGetter {
         Ok(balance)
     }
 
-    fn get_nonce(&mut self, height: u32, address: H160) -> Result<U256> {
+    fn get_nonce(&self, height: u32, address: H160) -> Result<U256> {
         let nonce_key = keys::nonce_key(&self.prefix, address);
         let nonce: Option<String> = self.conn.get_connection()?.vkv_get(nonce_key, height)?;
         let nonce = if let Some(s) = nonce {
@@ -552,7 +577,7 @@ impl Getter for RedisClusterGetter {
         Ok(nonce)
     }
 
-    fn get_byte_code(&mut self, height: u32, address: H160) -> Result<Vec<u8>> {
+    fn get_byte_code(&self, height: u32, address: H160) -> Result<Vec<u8>> {
         let code_key = keys::code_key(&self.prefix, address);
         let code: Option<String> = self.conn.get_connection()?.vkv_get(code_key, height)?;
         let code = if let Some(s) = code {
@@ -563,7 +588,7 @@ impl Getter for RedisClusterGetter {
         Ok(code)
     }
 
-    fn get_account_basic(&mut self, height: u32, address: H160) -> Result<AccountBasic> {
+    fn get_account_basic(&self, height: u32, address: H160) -> Result<AccountBasic> {
         Ok(AccountBasic {
             balance: self.get_balance(height, address)?,
             code: self.get_byte_code(height, address)?,
@@ -571,7 +596,7 @@ impl Getter for RedisClusterGetter {
         })
     }
 
-    fn addr_state_exists(&mut self, height: u32, address: H160) -> Result<bool> {
+    fn addr_state_exists(&self, height: u32, address: H160) -> Result<bool> {
         let state_addr_key = keys::state_addr_key(&self.prefix, address);
         let value: Option<String> = self
             .conn
@@ -580,7 +605,7 @@ impl Getter for RedisClusterGetter {
         Ok(value.is_some())
     }
 
-    fn get_state(&mut self, height: u32, address: H160, index: H256) -> Result<H256> {
+    fn get_state(&self, height: u32, address: H160, index: H256) -> Result<H256> {
         let state_key = keys::state_key(&self.prefix, address, index);
         let value: Option<String> = self.conn.get_connection()?.vkv_get(state_key, height)?;
         let val = if let Some(s) = value {
@@ -591,7 +616,7 @@ impl Getter for RedisClusterGetter {
         Ok(val)
     }
 
-    fn get_block_hash_by_height(&mut self, height: U256) -> Result<Option<H256>> {
+    fn get_block_hash_by_height(&self, height: U256) -> Result<Option<H256>> {
         let block_hash_key = keys::block_hash_key(&self.prefix, height);
         let value: Option<String> = self
             .conn
@@ -604,7 +629,7 @@ impl Getter for RedisClusterGetter {
         }
     }
 
-    fn get_height_by_block_hash(&mut self, block_hash: H256) -> Result<Option<U256>> {
+    fn get_height_by_block_hash(&self, block_hash: H256) -> Result<Option<U256>> {
         let block_height_key = keys::block_height_key(&self.prefix, block_hash);
         let value: Option<String> = self
             .conn
@@ -617,7 +642,7 @@ impl Getter for RedisClusterGetter {
         }
     }
 
-    fn get_block_by_hash(&mut self, block_hash: H256) -> Result<Option<Block>> {
+    fn get_block_by_hash(&self, block_hash: H256) -> Result<Option<Block>> {
         let block_key = keys::block_key(&self.prefix, block_hash);
         let value: Option<String> = self
             .conn
@@ -631,7 +656,7 @@ impl Getter for RedisClusterGetter {
     }
 
     fn get_transaction_receipt_by_block_hash(
-        &mut self,
+        &self,
         block_hash: H256,
     ) -> Result<Option<Vec<Receipt>>> {
         let receipt_key = keys::receipt_key(&self.prefix, block_hash);
@@ -644,7 +669,7 @@ impl Getter for RedisClusterGetter {
     }
 
     fn get_transaction_status_by_block_hash(
-        &mut self,
+        &self,
         block_hash: H256,
     ) -> Result<Option<Vec<TransactionStatus>>> {
         let status_key = keys::status_key(&self.prefix, block_hash);
@@ -657,7 +682,7 @@ impl Getter for RedisClusterGetter {
         }
     }
 
-    fn get_transaction_index_by_tx_hash(&mut self, tx_hash: H256) -> Result<Option<(H256, u32)>> {
+    fn get_transaction_index_by_tx_hash(&self, tx_hash: H256) -> Result<Option<(H256, u32)>> {
         let transaction_index_key = keys::transaction_index_key(&self.prefix, tx_hash);
 
         let value: Option<String> = self.conn.get_connection()?.get(transaction_index_key)?;
@@ -668,7 +693,7 @@ impl Getter for RedisClusterGetter {
         }
     }
 
-    fn get_pending_balance(&mut self, address: H160) -> Result<Option<U256>> {
+    fn get_pending_balance(&self, address: H160) -> Result<Option<U256>> {
         let balance_key = keys::pending_balance_key(&self.prefix, address);
         let balance: Option<String> = self.conn.get_connection()?.get(balance_key)?;
         let balance = if let Some(s) = balance {
@@ -679,7 +704,7 @@ impl Getter for RedisClusterGetter {
         Ok(balance)
     }
 
-    fn get_pending_nonce(&mut self, address: H160) -> Result<Option<U256>> {
+    fn get_pending_nonce(&self, address: H160) -> Result<Option<U256>> {
         let nonce_key = keys::pending_nonce_key(&self.prefix, address);
         let nonce: Option<String> = self.conn.get_connection()?.get(nonce_key)?;
         let nonce = if let Some(s) = nonce {
@@ -690,7 +715,7 @@ impl Getter for RedisClusterGetter {
         Ok(nonce)
     }
 
-    fn get_pending_byte_code(&mut self, address: H160) -> Result<Option<Vec<u8>>> {
+    fn get_pending_byte_code(&self, address: H160) -> Result<Option<Vec<u8>>> {
         let code_key = keys::pending_code_key(&self.prefix, address);
         let code: Option<String> = self.conn.get_connection()?.get(code_key)?;
         let code = if let Some(s) = code {
@@ -701,7 +726,7 @@ impl Getter for RedisClusterGetter {
         Ok(code)
     }
 
-    fn get_pending_state(&mut self, address: H160, index: H256) -> Result<Option<H256>> {
+    fn get_pending_state(&self, address: H160, index: H256) -> Result<Option<H256>> {
         let state_key = keys::pending_state_key(&self.prefix, address, index);
         let value: Option<String> = self.conn.get_connection()?.get(state_key)?;
         let val = if let Some(s) = value {
@@ -712,7 +737,7 @@ impl Getter for RedisClusterGetter {
         Ok(val)
     }
 
-    fn get_total_issuance(&mut self, height: u32) -> Result<U256> {
+    fn get_total_issuance(&self, height: u32) -> Result<U256> {
         let key = keys::total_issuance_key(&self.prefix);
         let value: Option<String> = self.conn.get_connection()?.vkv_get(key, height)?;
         let val = if let Some(s) = value {
@@ -723,7 +748,7 @@ impl Getter for RedisClusterGetter {
         Ok(val)
     }
 
-    fn get_allowances(&mut self, height: u32, owner: H160, spender: H160) -> Result<U256> {
+    fn get_allowances(&self, height: u32, owner: H160, spender: H160) -> Result<U256> {
         let key = keys::allowances_key(&self.prefix, owner, spender);
         let value: Option<String> = self.conn.get_connection()?.vkv_get(key, height)?;
         let val = if let Some(s) = value {

@@ -8,7 +8,11 @@ pub enum Error {
 
     #[cfg(feature = "postgres")]
     #[error(transparent)]
-    PostgresError(#[from] postgres::Error),
+    PostgresError(#[from] r2d2_postgres::postgres::Error),
+
+    #[cfg(feature = "postgres")]
+    #[error(transparent)]
+    R2D2PoolError(#[from] r2d2::Error),
 
     #[error(transparent)]
     FromHexError(#[from] hex::FromHexError),
