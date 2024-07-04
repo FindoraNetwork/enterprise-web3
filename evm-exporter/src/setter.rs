@@ -27,9 +27,6 @@ use {
 };
 
 pub trait Setter {
-    fn new(conn: ConnectionType, something: String) -> Self
-    where
-        Self: std::marker::Sized;
     fn clear(&self) -> Result<()>;
     fn set_height(&self, height: u32) -> Result<()>;
     fn set_lowest_height(&self, height: u32) -> Result<()>;
@@ -70,8 +67,8 @@ pub struct PgSetter {
 }
 
 #[cfg(feature = "postgres")]
-impl Setter for PgSetter {
-    fn new(connection: ConnectionType, _something: String) -> Self {
+impl PgSetter {
+    pub fn new(connection: ConnectionType, _something: String) -> Self {
         if let ConnectionType::Postgres(uri) = connection {
             let manager = PostgresConnectionManager::new(
                 uri.parse().expect("parse postgres uri failed"),
@@ -83,6 +80,10 @@ impl Setter for PgSetter {
             panic!("Invalid connection type for Postgres")
         }
     }
+}
+
+#[cfg(feature = "postgres")]
+impl Setter for PgSetter {
     fn clear(&self) -> Result<()> {
         self.conn.get()?.execute(
             r"TRUNCATE
@@ -305,8 +306,8 @@ pub struct RedisSetter {
 }
 
 #[cfg(feature = "redis")]
-impl Setter for RedisSetter {
-    fn new(connection: ConnectionType, prefix: String) -> Self {
+impl RedisSetter  {
+    pub fn new(connection: ConnectionType, prefix: String) -> Self {
         if let ConnectionType::Redis(url) = connection {
             Self {
                 conn: RedisClient::open(url).expect("Connect to Redis failed"),
@@ -316,7 +317,10 @@ impl Setter for RedisSetter {
             panic!("Invalid connection type for Redis")
         }
     }
+}
 
+#[cfg(feature = "redis")]
+impl Setter for RedisSetter {
     fn clear(&self) -> Result<()> {
         redis::cmd("FLUSHDB").arg("SYNC").query(&mut self.conn.get_connection()?)?;
         Ok(())
@@ -567,8 +571,8 @@ pub struct RedisClusterSetter {
 }
 
 #[cfg(feature = "redis-cluster")]
-impl Setter for RedisClusterSetter {
-    fn new(connection: ConnectionType, prefix: String) -> Self {
+impl RedisClusterSetter  {
+    pub fn new(connection: ConnectionType, prefix: String) -> Self {
         if let ConnectionType::RedisCluster(urls) = connection {
             Self {
                 conn: RedisClusterClient::new(urls.to_vec())
@@ -579,7 +583,10 @@ impl Setter for RedisClusterSetter {
             panic!("Invalid connection type for Redis Cluster")
         }
     }
+}
 
+#[cfg(feature = "redis-cluster")]
+impl Setter for RedisClusterSetter {
     fn clear(&self) -> Result<()> {
         redis::cmd("FLUSHDB").arg("SYNC").query(&mut self.conn.get_connection()?)?;
         Ok(())
