@@ -1,4 +1,4 @@
-use crate::vm::precompile::REDIS_POOL;
+use crate::vm::precompile::GETTER;
 
 mod config;
 mod notify;
@@ -6,8 +6,18 @@ mod rpc;
 mod utils;
 mod vm;
 
+#[cfg(feature = "redis")]
+use evm_exporter::{RedisGetter, PREFIX};
+
+#[cfg(feature = "redis-cluster")]
+use evm_exporter::{RedisClusterGetter, PREFIX};
+
+#[cfg(feature = "postgres")]
+use evm_exporter::PgGetter;
+
 use {
     config::Config,
+    evm_exporter::{ConnectionType, Getter},
     jsonrpc_core::MetaIoHandler,
     jsonrpc_http_server::DomainsValidation,
     jsonrpc_pubsub::PubSubHandler,
@@ -39,22 +49,33 @@ fn main() {
 
     let http = format!("0.0.0.0:{}", config.http_port);
     let ws = format!("0.0.0.0:{}", config.ws_port);
-    #[cfg(feature = "cluster_redis")]
-    let client = pnk!(redis::cluster::ClusterClient::open(
-        config.redis_url.clone()
-    ));
-    #[cfg(not(feature = "cluster_redis"))]
-    let client = Arc::new(pnk!(redis::Client::open(config.redis_url[0].as_ref())));
-    REDIS_POOL
-        .set(client.clone())
-        .expect("REDIS_POOL set error");
 
-    pnk!(init_upstream(client.clone()));
+    #[cfg(feature = "redis")]
+    let getter: Arc<dyn Getter + Sync + Send> = Arc::new(RedisGetter::new(
+        ConnectionType::Redis(config.redis_url[0].clone()),
+        PREFIX.to_string(),
+    ));
+
+    #[cfg(feature = "redis-cluster")]
+    let getter: Arc<dyn Getter + Sync + Send> = Arc::new(RedisGetter::new(
+        ConnectionType::RedisCluster(config.redis_url.clone()),
+        PREFIX.to_string(),
+    ));
+
+    #[cfg(feature = "postgres")]
+    let getter: Arc<dyn Getter + Sync + Send> = Arc::new(PgGetter::new(
+        ConnectionType::Postgres(config.postgres_uri),
+        String::new(),
+    ));
+
+    pnk!(GETTER.set(getter.clone()).map_err(|_| eg!()));
+    pnk!(init_upstream(getter.clone()));
+
     let tm_client = Arc::new(pnk!(HttpClient::new(config.tendermint_url.as_str())));
     let eth = EthService::new(
         config.chain_id,
         config.gas_price,
-        client.clone(),
+        getter.clone(),
         tm_client,
         config.tendermint_url.as_str(),
     );
@@ -63,17 +84,17 @@ fn main() {
     let debug = DebugApiImpl::new(
         config.chain_id,
         config.gas_price,
-        client.clone(),
+        getter.clone(),
         config.tendermint_url.as_str(),
     );
     let health = HealthApiImpl::new();
-    let filter = EthFilterApiImpl::new(client.clone());
+    let filter = EthFilterApiImpl::new(getter.clone());
     let subscriber_notify = Arc::new(SubscriberNotify::new(
-        client.clone(),
+        getter.clone(),
         &config.tendermint_url,
     ));
     pnk!(subscriber_notify.start());
-    let pub_sub = EthPubSubApiImpl::new(client, subscriber_notify);
+    let pub_sub = EthPubSubApiImpl::new(getter.clone(), subscriber_notify);
 
     let mut io = MetaIoHandler::default();
     io.extend_with(eth.to_delegate());

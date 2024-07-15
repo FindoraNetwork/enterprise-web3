@@ -16,6 +16,10 @@ mod utils;
 pub use utils::*;
 
 pub enum ConnectionType {
-    Redis(redis::Connection),
-    Postgres(sqlx::PgConnection),
+    #[cfg(feature = "redis")]
+    Redis(String),
+    #[cfg(feature = "redis-cluster")]
+    RedisCluster(Vec<String>),
+    #[cfg(feature = "postgres")]
+    Postgres(String),
 }

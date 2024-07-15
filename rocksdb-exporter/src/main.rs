@@ -1,9 +1,18 @@
 mod config;
 mod evm_rocksdb_storage;
 
+#[cfg(feature = "redis-cluster")]
+use evm_exporter::{RedisClusterGetter, RedisClusterSetter, PREFIX};
+
+#[cfg(feature = "redis")]
+use evm_exporter::{RedisGetter, RedisSetter, PREFIX};
+
+#[cfg(feature = "postgres")]
+use evm_exporter::{PgGetter, PgSetter};
+
 use {
     config::Config,
-    evm_exporter::{ConnectionType, Getter, RedisGetter, RedisSetter, Setter, PREFIX},
+    evm_exporter::{ConnectionType, Getter, Setter},
     evm_rocksdb_storage::{
         evm_rocksdb::RocksDB, get_account_info, get_block_info, get_current_height,
     },
@@ -19,23 +28,43 @@ fn main() {
     let statedb = Arc::new(pnk!(RocksDB::open(config.state_db_path.as_str())));
     let hisdb = Arc::new(pnk!(RocksDB::open(config.history_db_path.as_str())));
 
-    #[cfg(feature = "cluster_redis")]
-    let client = pnk!(redis::cluster::ClusterClient::open(
-        config.redis_url.clone()
+    #[cfg(feature = "redis-cluster")]
+    let setter: Arc<dyn Setter> = Arc::new(RedisClusterSetter::new(
+        ConnectionType::RedisCluster(config.redis_url.clone()),
+        PREFIX.to_string(),
     ));
-    #[cfg(not(feature = "cluster_redis"))]
-    let client = pnk!(redis::Client::open(config.redis_url[0].as_ref()));
+    #[cfg(feature = "redis-cluster")]
+    let getter: Arc<dyn Getter> = Arc::new(RedisClusterGetter::new(
+        ConnectionType::RedisCluster(config.redis_url.clone()),
+        PREFIX.to_string(),
+    ));
+    #[cfg(feature = "redis")]
+    let setter: Arc<dyn Setter> = Arc::new(RedisSetter::new(
+        ConnectionType::Redis(config.redis_url[0].clone()),
+        PREFIX.to_string(),
+    ));
+    #[cfg(feature = "redis")]
+    let getter: Arc<dyn Getter> = Arc::new(RedisGetter::new(
+        ConnectionType::Redis(config.redis_url[0].clone()),
+        PREFIX.to_string(),
+    ));
+    #[cfg(feature = "postgres")]
+    let setter: Arc<dyn Setter> = Arc::new(PgSetter::new(
+        ConnectionType::Postgres(config.postgres_uri.clone()),
+        String::new(),
+    ));
+    #[cfg(feature = "postgres")]
+    let getter: Arc<dyn Getter> = Arc::new(PgGetter::new(
+        ConnectionType::Postgres(config.postgres_uri.clone()),
+        String::new(),
+    ));
 
-    let conn = pnk!(client.get_connection());
-    let mut setter: RedisSetter = Setter::new(ConnectionType::Redis(conn), PREFIX.to_string());
     let current_height = pnk!(get_current_height(&hisdb));
 
     let mut height = if config.clear {
         pnk!(setter.clear());
         U256::zero()
     } else {
-        let conn = pnk!(client.get_connection());
-        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
         U256::from(pnk!(getter.latest_height()))
     };
 

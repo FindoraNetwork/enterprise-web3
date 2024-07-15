@@ -1,27 +1,17 @@
 use {
     crate::notify::notifications::Notifications,
     ethereum_types::{H256, U256},
-    evm_exporter::{ConnectionType, Getter, RedisGetter, PREFIX},
+    evm_exporter::Getter,
     ruc::*,
     serde_json::Value,
     sha2::{Digest, Sha256},
     std::{sync::Arc, thread, time},
 };
 
-#[cfg(feature = "cluster_redis")]
-pub struct SubscriberNotify {
-    client: Arc<redis::cluster::ClusterClient>,
-    pub logs_event_notify: Arc<Notifications<U256>>,
-    pub new_heads_event_notify: Arc<Notifications<U256>>,
-    pub new_pending_tx_hash_event_notify: Arc<Notifications<H256>>,
-    pub syncing_event_notify: Arc<Notifications<bool>>,
-}
-
-#[cfg(not(feature = "cluster_redis"))]
 pub struct SubscriberNotify {
     tm_url: String,
     millis: u64,
-    redis_pool: Arc<redis::Client>,
+    getter: Arc<dyn Getter + Send + Sync>,
     pub logs_event_notify: Arc<Notifications<U256>>,
     pub new_heads_event_notify: Arc<Notifications<U256>>,
     pub new_pending_tx_hash_event_notify: Arc<Notifications<H256>>,
@@ -29,26 +19,11 @@ pub struct SubscriberNotify {
 }
 
 impl SubscriberNotify {
-    #[cfg(feature = "cluster_redis")]
-    pub fn new(client: Arc<redis::cluster::ClusterClient>, tm_url: &str) -> Self {
+    pub fn new(client: Arc<dyn Getter + Send + Sync>, tm_url: &str) -> Self {
         Self {
             tm_url: String::from(tm_url),
             millis: 2000,
-            client,
-            tm_client,
-            logs_event_notify: Arc::new(Notifications::new()),
-            new_heads_event_notify: Arc::new(Notifications::new()),
-            new_pending_tx_hash_event_notify: Arc::new(Notifications::new()),
-            syncing_event_notify: Arc::new(Notifications::new()),
-        }
-    }
-
-    #[cfg(not(feature = "cluster_redis"))]
-    pub fn new(redis_pool: Arc<redis::Client>, tm_url: &str) -> Self {
-        Self {
-            tm_url: String::from(tm_url),
-            millis: 2000,
-            redis_pool,
+            getter: client,
             logs_event_notify: Arc::new(Notifications::new()),
             new_heads_event_notify: Arc::new(Notifications::new()),
             new_pending_tx_hash_event_notify: Arc::new(Notifications::new()),
@@ -63,33 +38,25 @@ impl SubscriberNotify {
         let new_pending_tx_hash_event_notify = self.new_pending_tx_hash_event_notify.clone();
         let syncing_event_notify = self.syncing_event_notify.clone();
 
-        let redis_pool = self.redis_pool.clone();
-        let conn = self.redis_pool.get_connection().c(d!())?;
-        let mut getter: RedisGetter = Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-        let mut last_height = getter.latest_height().c(d!())?;
-
+        let mut last_height = self.getter.latest_height().c(d!())?;
         let mut last_txhash = vec![];
         let mut last_status = Option::None;
 
         let tm_url = self.tm_url.clone();
+        let getter = self.getter.clone();
         thread::spawn(move || loop {
             thread::sleep(ten_millis);
-
-            if let Ok(conn) = redis_pool.get_connection() {
-                let mut getter: RedisGetter =
-                    Getter::new(ConnectionType::Redis(conn), PREFIX.to_string());
-                if let Ok(height) = getter.latest_height() {
-                    if last_height != height {
-                        for h in (last_height + 1)..=height {
-                            logs_event_notify.notify(U256::from(h)).unwrap_or_default();
-                            new_heads_event_notify
-                                .notify(U256::from(h))
-                                .unwrap_or_default();
-                        }
-                        last_height = height;
+            if let Ok(height) = getter.latest_height() {
+                if last_height != height {
+                    for h in (last_height + 1)..=height {
+                        logs_event_notify.notify(U256::from(h)).unwrap_or_default();
+                        new_heads_event_notify
+                            .notify(U256::from(h))
+                            .unwrap_or_default();
                     }
-                };
-            }
+                    last_height = height;
+                }
+            };
 
             if let Ok(hashs) = get_pending_hash(&tm_url) {
                 for hash in &hashs {
