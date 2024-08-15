@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS allowances (
     owner CHARACTER VARYING(64) NOT NULL,
     spender CHARACTER VARYING(64) NOT NULL,
     value CHARACTER VARYING(128) NOT NULL,
-    height SERIAL NOT NULL
+    height BIGSERIAL NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS allowances_owner_idx ON allowances(owner);

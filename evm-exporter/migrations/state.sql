@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS state (
     value CHARACTER VARYING(128) NOT NULL,
     idx CHARACTER VARYING(128) NOT NULL,
     address CHARACTER VARYING(64) NOT NULL,
-    height SERIAL NOT NULL
+    height BIGSERIAL NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS state_address_idx ON state(address);
