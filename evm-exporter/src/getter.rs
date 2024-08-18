@@ -77,14 +77,14 @@ impl Getter for PgGetter {
             .conn
             .get()?
             .query_one("SELECT latest_height FROM common", &[])?
-            .get("latest_height"))
+            .get::<&str, i64>("latest_height") as u32)
     }
     fn lowest_height(&self) -> Result<u32> {
         Ok(self
             .conn
             .get()?
             .query_one("SELECT lowest_height FROM common", &[])?
-            .get("lowest_height"))
+            .get::<&str, i64>("lowest_height") as u32)
     }
     fn get_balance(&self, height: u32, address: H160) -> Result<U256> {
         Ok(U256::from_str(
@@ -92,7 +92,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT balance FROM balance WHERE address = $1 AND height = $2",
-                    &[&address.to_string(), &height],
+                    &[&address.to_string(), &(height as i64)],
                 )?
                 .get("balance"),
         )?)
@@ -103,7 +103,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT nonce FROM nonce WHERE address = $1 AND height = $2",
-                    &[&address.to_string(), &height],
+                    &[&address.to_string(), &(height as i64)],
                 )?
                 .get("nonce"),
         )?)
@@ -114,7 +114,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT code FROM byte_code WHERE address = $1 AND height = $2",
-                    &[&address.to_string(), &height],
+                    &[&address.to_string(), &(height as i64)],
                 )?
                 .get("code"),
         )?)
@@ -132,7 +132,7 @@ impl Getter for PgGetter {
             .get()?
             .query_one(
                 "SELECT 1 FROM state WHERE address = $1 AND height = $2",
-                &[&address.to_string(), &height],
+                &[&address.to_string(), &(height as i64)],
             )?
             .is_empty())
     }
@@ -142,7 +142,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT value FROM state WHERE idx = $1 AND address = $2 AND height = $3",
-                    &[&index.to_string(), &address.to_string(), &height],
+                    &[&index.to_string(), &address.to_string(), &(height as i64)],
                 )?
                 .get("value"),
         )?)
@@ -267,7 +267,10 @@ impl Getter for PgGetter {
         Ok(U256::from_str(
             self.conn
                 .get()?
-                .query_one("SELECT value FROM issuance WHERE height = $1", &[&height])?
+                .query_one(
+                    "SELECT value FROM issuance WHERE height = $1",
+                    &[&(height as i64)],
+                )?
                 .get("value"),
         )?)
     }
@@ -275,7 +278,10 @@ impl Getter for PgGetter {
         Ok(U256::from_str(
             self.conn
                 .get()?
-                .query_one("SELECT value FROM allowances WHERE owner = $1 AND spender = $2 AND height = $3", &[&owner.to_string(),&spender.to_string(),&height])?
+                .query_one(
+                    "SELECT value FROM allowances WHERE owner = $1 AND spender = $2 AND height = $3", 
+                    &[&owner.to_string(),&spender.to_string(),&( height as i64 )],
+                )?
                 .get("value"),
         )?)
     }
