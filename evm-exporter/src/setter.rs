@@ -292,7 +292,7 @@ impl Setter for PgSetter {
         value: U256,
     ) -> Result<()> {
         self.conn.get()?.execute("INSERT INTO allowances(owner, spender, value, height) VALUES($1, $2, $3, $4)", 
-            &[&owner.to_string(), &spender.to_string(), &value.to_string(),&height],
+            &[&owner.to_string(), &spender.to_string(), &value.to_string(), &( height as i64 )],
         )?;
         Ok(())
     }
