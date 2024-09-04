@@ -1,4 +1,4 @@
-FROM docker.io/rust:slim-buster AS builder
+FROM rust:1.79.0-buster AS builder
 
 RUN apt-get update -y && apt-get install -y libssl-dev pkg-config make perl clang llvm
 ENV OPENSSL_LIB_DIR="/usr/lib/x86_64-linux-gnu"
