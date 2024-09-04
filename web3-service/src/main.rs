@@ -68,7 +68,7 @@ fn main() {
         String::new(),
     ));
 
-    pnk!(GETTER.set(getter.clone()).map_err(|_| eg!()));
+    // pnk!(GETTER.set(getter.clone()).map_err(|_| eg!()));
     pnk!(init_upstream(getter.clone()));
 
     let tm_client = Arc::new(pnk!(HttpClient::new(config.tendermint_url.as_str())));
