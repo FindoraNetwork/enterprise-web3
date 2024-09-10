@@ -12,9 +12,10 @@ use {
     ethereum_types::{BigEndianHash, H160, H256, H512, H64, U256, U64},
     evm::{
         executor::stack::{StackExecutor, StackSubstateMetadata},
-        {ExitError, ExitReason},
+        ExitError, ExitReason,
     },
     evm_exporter::{public_key, Getter, TransactionStatus},
+    futures::TryFutureExt,
     jsonrpc_core::{futures::future, BoxFuture, Error, ErrorCode, Result, Value},
     lazy_static::lazy_static,
     sha3::{Digest, Keccak256},
@@ -388,13 +389,26 @@ impl EthApi for EthService {
 
     fn block_number(&self) -> BoxFuture<Result<U256>> {
         log::info!(target: "eth api", "block_number");
-        match self.getter.latest_height() {
-            Ok(height) => Box::pin(future::ok(U256::from(height))),
-            Err(e) => Box::pin(future::err(internal_err(format!(
-                "eth api block_number latest_height error:{:?}",
-                e.to_string()
-            )))),
-        }
+        let getter = self.getter.clone();
+
+        Box::pin(async move {
+            let result = tokio::task::spawn_blocking(move || getter.latest_height())
+                .await
+                .map_err(|e| {
+                    internal_err(format!(
+                        "eth api block_number latest_height error:{:?}",
+                        e.to_string()
+                    ))
+                })?;
+
+            match result {
+                Ok(height) => Ok(U256::from(height)),
+                Err(e) => Err(internal_err(format!(
+                    "eth api block_number latest_height error:{:?}",
+                    e.to_string()
+                ))),
+            }
+        })
     }
 
     fn storage_at(
