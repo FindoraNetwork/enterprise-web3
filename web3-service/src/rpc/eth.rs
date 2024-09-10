@@ -765,47 +765,42 @@ impl EthApi for EthService {
         number: BlockNumber,
     ) -> BoxFuture<Result<Option<U256>>> {
         log::info!(target: "eth api", "block_transaction_count_by_number number:{:?}", &number);
-        let height = match block_number_to_height(Some(number), self.getter.clone()) {
-            Ok(h) => h,
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
+        let getter = self.getter.clone();
+
+        Box::pin(async move {
+            let getter_clone = getter.clone();
+            let height = tokio::task::block_in_place(move || {
+                block_number_to_height(Some(number), getter_clone.clone()).map_err(|e| {
+                    internal_err(format!(
                     "eth api block_transaction_count_by_number block_number_to_height error:{:?}",
                     e.to_string()
-                ))));
-            }
-        };
-        let hash = match self.getter.get_block_hash_by_height(U256::from(height)) {
-            Ok(value) => {
-                if let Some(hash) = value {
-                    hash
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
+                ))
+                })
+            })?;
+
+            let getter_clone = getter.clone();
+            let hash = tokio::task::block_in_place(move || {
+                getter_clone.get_block_hash_by_height(U256::from(height))
+            })
+            .map_err(|e| {
+                internal_err(format!(
                     "eth api block_transaction_count_by_number get_block_hash_by_height error:{:?}",
                     e.to_string()
-                ))));
-            }
-        };
+                ))
+            })?
+            .ok_or_else(|| internal_err("block hash not found"))?;
 
-        let block = match self.getter.get_block_by_hash(hash) {
-            Ok(value) => {
-                if let Some(block) = value {
-                    block
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api block_transaction_count_by_number get_block_by_hash error:{:?}",
-                    e.to_string()
-                ))));
-            }
-        };
-        Box::pin(future::ok(Some(U256::from(block.transactions.len()))))
+            let block = tokio::task::block_in_place(move || getter.get_block_by_hash(hash))
+                .map_err(|e| {
+                    internal_err(format!(
+                        "eth api block_transaction_count_by_number get_block_by_hash error:{:?}",
+                        e.to_string()
+                    ))
+                })?
+                .ok_or_else(|| internal_err("block not found"))?;
+
+            Ok(Some(U256::from(block.transactions.len())))
+        })
     }
 
     fn block_uncles_count_by_hash(&self, _: H256) -> Result<U256> {
