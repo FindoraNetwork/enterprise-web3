@@ -684,37 +684,63 @@ impl EthApi for EthService {
         number: Option<BlockNumber>,
     ) -> BoxFuture<Result<U256>> {
         log::info!(target: "eth api", "transaction_count address:{:?} number:{:?}", &address, &number);
-        if let Some(BlockNumber::Pending) = number {
-            match self.getter.get_pending_nonce(address) {
-                Ok(nonce) => {
-                    if let Some(val) = nonce {
-                        return Box::pin(future::ok(val));
-                    }
-                }
-                Err(e) => {
-                    return Box::pin(future::err(internal_err(format!(
-                        "eth api transaction_count get_pending_nonce error:{:?}",
+
+        let getter = self.getter.clone();
+
+        Box::pin(async move {
+            if let Some(BlockNumber::Pending) = number {
+                let pending_nonce_result =
+                    tokio::task::spawn_blocking(move || getter.get_pending_nonce(address))
+                        .await
+                        .map_err(|e| {
+                            internal_err(format!(
+                        "eth api transaction_count spawn_blocking get_pending_nonce error: {:?}",
                         e.to_string()
-                    ))));
+                    ))
+                        })?;
+
+                let nonce = match pending_nonce_result {
+                    Ok(Some(val)) => val,
+                    Ok(None) => return Ok(U256::zero()),
+                    Err(e) => {
+                        return Err(internal_err(format!(
+                            "eth api transaction_count get_pending_nonce error: {:?}",
+                            e.to_string()
+                        )))
+                    }
+                };
+
+                return Ok(nonce);
+            }
+
+            let height = match block_number_to_height(number, getter.clone()) {
+                Ok(h) => h,
+                Err(e) => {
+                    return Err(internal_err(format!(
+                        "eth api transaction_count block_number_to_height error: {:?}",
+                        e.to_string()
+                    )))
                 }
-            }
-        };
-        let height = match block_number_to_height(number, self.getter.clone()) {
-            Ok(h) => h,
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api transaction_count block_number_to_height error:{:?}",
+            };
+
+            let nonce_result =
+                tokio::task::spawn_blocking(move || getter.get_nonce(height, address))
+                    .await
+                    .map_err(|e| {
+                        internal_err(format!(
+                            "eth api transaction_count spawn_blocking get_nonce error: {:?}",
+                            e.to_string()
+                        ))
+                    })?;
+
+            match nonce_result {
+                Ok(nonce) => Ok(nonce),
+                Err(e) => Err(internal_err(format!(
+                    "eth api transaction_count get_nonce error: {:?}",
                     e.to_string()
-                ))));
+                ))),
             }
-        };
-        match self.getter.get_nonce(height, address) {
-            Ok(nonce) => Box::pin(future::ok(nonce)),
-            Err(e) => Box::pin(future::err(internal_err(format!(
-                "eth api transaction_count get_nonce error:{:?}",
-                e.to_string()
-            )))),
-        }
+        })
     }
 
     fn block_transaction_count_by_hash(&self, hash: H256) -> BoxFuture<Result<Option<U256>>> {
