@@ -470,43 +470,71 @@ impl EthApi for EthService {
         number: Option<BlockNumber>,
     ) -> BoxFuture<Result<H256>> {
         log::info!(target: "eth api", "storage_at address:{:?} index:{:?} number:{:?}", &address, &index, &number);
-        if let Some(BlockNumber::Pending) = number {
-            match self
-                .getter
-                .get_pending_state(address, H256::from_uint(&index))
-            {
-                Ok(value) => {
-                    if let Some(val) = value {
-                        return Box::pin(future::ok(val));
+        let getter = self.getter.clone();
+        let index = H256::from_uint(&index);
+
+        Box::pin(async move {
+            if let Some(BlockNumber::Pending) = number {
+                let getter_clone = getter.clone();
+                let pending_state = tokio::task::spawn_blocking(move || {
+                    getter_clone.get_pending_state(address, index)
+                })
+                .await
+                .map_err(|e| {
+                    internal_err(format!(
+                        "eth api storage_at spawn_blocking get_pending_state error: {:?}",
+                        e.to_string()
+                    ))
+                })?;
+
+                match pending_state {
+                    Ok(Some(value)) => return Ok(value),
+                    Ok(None) => return Ok(H256::default()),
+                    Err(e) => {
+                        return Err(internal_err(format!(
+                            "eth api storage_at get_pending_state error: {:?}",
+                            e.to_string()
+                        )));
                     }
                 }
-                Err(e) => {
-                    return Box::pin(future::err(internal_err(format!(
-                        "eth api storage_at get_pending_state error:{:?}",
-                        e.to_string()
-                    ))));
-                }
             }
-        };
-        let height = match block_number_to_height(number, self.getter.clone()) {
-            Ok(h) => h,
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api storage_at block_number_to_height error:{:?}",
+
+            let getter_clone = getter.clone();
+            let height = tokio::task::spawn_blocking(move || {
+                block_number_to_height(number, getter_clone.clone())
+            })
+            .await
+            .map_err(|e| {
+                internal_err(format!(
+                    "eth api storage_at spawn_blocking block_number_to_height error: {:?}",
                     e.to_string()
-                ))));
+                ))
+            })?
+            .map_err(|e| {
+                internal_err(format!(
+                    "eth api storage_at block_number_to_height error: {:?}",
+                    e.to_string()
+                ))
+            })?;
+
+            let state =
+                tokio::task::spawn_blocking(move || getter.get_state(height, address, index))
+                    .await
+                    .map_err(|e| {
+                        internal_err(format!(
+                            "eth api storage_at spawn_blocking get_state error: {:?}",
+                            e.to_string()
+                        ))
+                    })?;
+
+            match state {
+                Ok(value) => Ok(value),
+                Err(e) => Err(internal_err(format!(
+                    "eth api storage_at get_state error: {:?}",
+                    e.to_string()
+                ))),
             }
-        };
-        match self
-            .getter
-            .get_state(height, address, H256::from_uint(&index))
-        {
-            Ok(value) => Box::pin(future::ok(value)),
-            Err(e) => Box::pin(future::err(internal_err(format!(
-                "eth api storage_at get_state error:{:?}",
-                e.to_string()
-            )))),
-        }
+        })
     }
 
     fn block_by_hash(&self, hash: H256, full: bool) -> BoxFuture<Result<Option<RichBlock>>> {
