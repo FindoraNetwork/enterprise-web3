@@ -1470,142 +1470,180 @@ impl EthApi for EthService {
 
     fn transaction_receipt(&self, tx_hash: H256) -> BoxFuture<Result<Option<Receipt>>> {
         log::info!(target: "eth api", "transaction_receipt tx_hash:{:?}", &tx_hash);
-        let (hash, index) = match self.getter.get_transaction_index_by_tx_hash(tx_hash) {
-            Ok(value) => {
-                if let Some(hash_index) = value {
-                    hash_index
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api transaction_receipt get_block_by_hash error:{:?}",
+        let getter = self.getter.clone();
+
+        Box::pin(async move {
+            let getter_clone = getter.clone();
+            let index_result = tokio::task::spawn_blocking(move || {
+            getter_clone .get_transaction_index_by_tx_hash(tx_hash)
+                .map_err(|e| internal_err(format!(
+                    "eth api transaction_receipt get_transaction_index_by_tx_hash error:{:?}",
                     e.to_string()
-                ))));
-            }
-        };
-        let block = match self.getter.get_block_by_hash(hash) {
-            Ok(value) => {
-                if let Some(hash_index) = value {
-                    hash_index
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api transaction_receipt get_block_by_hash error:{:?}",
+                )))
+        })
+        .await
+        .map_err(|e| internal_err(format!(
+            "eth api transaction_receipt spawn_blocking get_transaction_index_by_tx_hash error:{:?}",
+            e.to_string()
+        )))?;
+
+            let (hash, index) = match index_result {
+                Ok(Some(value)) => value,
+                Ok(None) => return Ok(None),
+                Err(e) => return Err(e),
+            };
+
+            let getter_clone = getter.clone();
+            let block_result = tokio::task::spawn_blocking(move || {
+                getter_clone.get_block_by_hash(hash).map_err(|e| {
+                    internal_err(format!(
+                        "eth api transaction_receipt get_block_by_hash error:{:?}",
+                        e.to_string()
+                    ))
+                })
+            })
+            .await
+            .map_err(|e| {
+                internal_err(format!(
+                    "eth api transaction_receipt spawn_blocking get_block_by_hash error:{:?}",
                     e.to_string()
-                ))));
-            }
-        };
-        let statuses = match self.getter.get_transaction_status_by_block_hash(hash) {
-            Ok(value) => {
-                if let Some(hash_index) = value {
-                    hash_index
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
+                ))
+            })?;
+
+            let block = match block_result {
+                Ok(Some(b)) => b,
+                Ok(None) => return Ok(None),
+                Err(e) => return Err(e),
+            };
+
+            let getter_clone = getter.clone();
+            let statuses_result = tokio::task::spawn_blocking(move || {
+            getter_clone .get_transaction_status_by_block_hash(hash)
+                .map_err(|e| internal_err(format!(
                     "eth api transaction_receipt get_transaction_status_by_block_hash error:{:?}",
                     e.to_string()
-                ))));
-            }
-        };
-        let status = statuses[index as usize].clone();
+                )))
+        })
+        .await
+        .map_err(|e| internal_err(format!(
+            "eth api transaction_receipt spawn_blocking get_transaction_status_by_block_hash error:{:?}",
+            e.to_string()
+        )))?;
 
-        let receipts = match self.getter.get_transaction_receipt_by_block_hash(hash) {
-            Ok(value) => {
-                if let Some(hash_index) = value {
-                    hash_index
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
+            let statuses = match statuses_result {
+                Ok(Some(s)) => s,
+                Ok(None) => return Ok(None),
+                Err(e) => return Err(e),
+            };
+
+            let receipts_result = tokio::task::spawn_blocking(move || {
+            getter.get_transaction_receipt_by_block_hash(hash)
+                .map_err(|e| internal_err(format!(
                     "eth api transaction_receipt get_transaction_receipt_by_block_hash error:{:?}",
                     e.to_string()
-                ))));
-            }
-        };
-        let receipt = receipts[index as usize].clone();
-        let (logs, status_code, logs_bloom, used_gas) = match receipt {
-            ReceiptAny::Frontier(r) => (
-                r.logs,
-                U64::from(r.state_root.to_low_u64_be()),
-                r.logs_bloom,
-                r.used_gas,
-            ),
-            ReceiptAny::EIP658(r) => (r.logs, U64::from(r.status_code), r.logs_bloom, r.used_gas),
-            ReceiptAny::EIP2930(r) => (r.logs, U64::from(r.status_code), r.logs_bloom, r.used_gas),
-            ReceiptAny::EIP1559(r) => (r.logs, U64::from(r.status_code), r.logs_bloom, r.used_gas),
-        };
-        let mut cumulative_receipts = receipts;
-        cumulative_receipts.truncate((status.transaction_index + 1) as usize);
+                )))
+        })
+        .await
+        .map_err(|e| internal_err(format!(
+            "eth api transaction_receipt spawn_blocking get_transaction_receipt_by_block_hash error:{:?}",
+            e.to_string()
+        )))?;
 
-        let receipt = Receipt {
-            transaction_hash: Some(tx_hash),
-            transaction_index: Some(index.into()),
-            block_hash: Some(block.header.hash()),
-            from: Some(status.from),
-            to: status.to,
-            block_number: Some(block.header.number),
-            cumulative_gas_used: {
-                let cumulative_gas: u32 = cumulative_receipts
-                    .iter()
-                    .map(|r| {
-                        match r {
+            let receipts = match receipts_result {
+                Ok(Some(r)) => r,
+                Ok(None) => return Ok(None),
+                Err(e) => return Err(e),
+            };
+
+            let status = statuses
+                .get(index as usize)
+                .cloned()
+                .ok_or_else(|| internal_err("Transaction status not found".to_string()))?;
+
+            let receipt = receipts
+                .get(index as usize)
+                .cloned()
+                .ok_or_else(|| internal_err("Transaction receipt not found".to_string()))?;
+
+            let (logs, status_code, logs_bloom, used_gas) = match receipt {
+                ReceiptAny::Frontier(r) => (
+                    r.logs,
+                    U64::from(r.state_root.to_low_u64_be()),
+                    r.logs_bloom,
+                    r.used_gas,
+                ),
+                ReceiptAny::EIP658(r) => {
+                    (r.logs, U64::from(r.status_code), r.logs_bloom, r.used_gas)
+                }
+                ReceiptAny::EIP2930(r) => {
+                    (r.logs, U64::from(r.status_code), r.logs_bloom, r.used_gas)
+                }
+                ReceiptAny::EIP1559(r) => {
+                    (r.logs, U64::from(r.status_code), r.logs_bloom, r.used_gas)
+                }
+            };
+
+            let mut cumulative_receipts = receipts;
+            cumulative_receipts.truncate((status.transaction_index + 1) as usize);
+
+            let receipt = Receipt {
+                transaction_hash: Some(tx_hash),
+                transaction_index: Some(index.into()),
+                block_hash: Some(block.header.hash()),
+                from: Some(status.from),
+                to: status.to,
+                block_number: Some(block.header.number),
+                cumulative_gas_used: {
+                    let cumulative_gas: u32 = cumulative_receipts
+                        .iter()
+                        .map(|r| match r {
                             ReceiptAny::Frontier(r) => r.used_gas,
                             ReceiptAny::EIP658(r) => r.used_gas,
                             ReceiptAny::EIP2930(r) => r.used_gas,
                             ReceiptAny::EIP1559(r) => r.used_gas,
-                        }
-                        .as_u32()
-                    })
-                    .sum();
-                U256::from(cumulative_gas)
-            },
-            gas_used: Some(used_gas),
-            contract_address: status.contract_address,
-            logs: {
-                let mut pre_receipts_log_index = None;
-                if !cumulative_receipts.is_empty() {
-                    cumulative_receipts.truncate(cumulative_receipts.len() - 1);
-                    pre_receipts_log_index = Some(
-                        cumulative_receipts
-                            .iter()
-                            .map(|_| logs.len() as u32)
-                            .sum::<u32>(),
-                    );
-                }
-                logs.iter()
-                    .enumerate()
-                    .map(|(i, log)| Log {
-                        address: log.address,
-                        topics: log.topics.clone(),
-                        data: Bytes(log.data.clone()),
-                        block_hash: Some(block.header.hash()),
-                        block_number: Some(block.header.number),
-                        transaction_hash: Some(status.transaction_hash),
-                        transaction_index: Some(status.transaction_index.into()),
-                        log_index: Some(U256::from(
-                            (pre_receipts_log_index.unwrap_or(0)) + i as u32,
-                        )),
-                        transaction_log_index: Some(U256::from(i)),
-                        removed: false,
-                    })
-                    .collect()
-            },
-            status_code: Some(status_code),
-            logs_bloom,
-            state_root: None,
-        };
+                        })
+                        .map(|g| g.as_u32())
+                        .sum();
+                    U256::from(cumulative_gas)
+                },
+                gas_used: Some(used_gas),
+                contract_address: status.contract_address,
+                logs: {
+                    let mut pre_receipts_log_index = None;
+                    if !cumulative_receipts.is_empty() {
+                        cumulative_receipts.truncate(cumulative_receipts.len() - 1);
+                        pre_receipts_log_index = Some(
+                            cumulative_receipts
+                                .iter()
+                                .map(|_| logs.len() as u32)
+                                .sum::<u32>(),
+                        );
+                    }
+                    logs.iter()
+                        .enumerate()
+                        .map(|(i, log)| Log {
+                            address: log.address,
+                            topics: log.topics.clone(),
+                            data: Bytes(log.data.clone()),
+                            block_hash: Some(block.header.hash()),
+                            block_number: Some(block.header.number),
+                            transaction_hash: Some(status.transaction_hash),
+                            transaction_index: Some(status.transaction_index.into()),
+                            log_index: Some(U256::from(
+                                (pre_receipts_log_index.unwrap_or(0)) + i as u32,
+                            )),
+                            transaction_log_index: Some(U256::from(i)),
+                            removed: false,
+                        })
+                        .collect()
+                },
+                status_code: Some(status_code),
+                logs_bloom,
+                state_root: None,
+            };
 
-        Box::pin(future::ok(Some(receipt)))
+            Ok(Some(receipt))
+        })
     }
 
     fn uncle_by_block_hash_and_index(&self, _: H256, _: Index) -> Result<Option<RichBlock>> {
