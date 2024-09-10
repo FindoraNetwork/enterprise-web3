@@ -229,39 +229,72 @@ impl EthApi for EthService {
 
     fn balance(&self, address: H160, number: Option<BlockNumber>) -> BoxFuture<Result<U256>> {
         log::info!(target: "eth api", "balance address:{:?} number:{:?}", &address, &number);
-        if let Some(BlockNumber::Pending) = number {
-            match self.getter.get_pending_balance(address) {
-                Ok(balance) => {
-                    if let Some(val) = balance {
-                        return Box::pin(future::ok(val));
+
+        let getter = self.getter.clone();
+        let address_clone = address.clone();
+        let number_clone = number.clone();
+
+        Box::pin(async move {
+            let getter_clone = getter.clone();
+            if let Some(BlockNumber::Pending) = number_clone {
+                let result = tokio::task::spawn_blocking(move || {
+                    getter_clone.get_pending_balance(address_clone)
+                })
+                .await
+                .map_err(|e| {
+                    internal_err(format!(
+                        "eth api balance get_pending_balance error: {:?}",
+                        e.to_string()
+                    ))
+                })?;
+
+                match result {
+                    Ok(Some(balance)) => return Ok(balance),
+                    Ok(None) => {}
+                    Err(e) => {
+                        return Err(internal_err(format!(
+                            "eth api balance get_pending_balance error: {:?}",
+                            e.to_string()
+                        )))
                     }
                 }
-                Err(e) => {
-                    return Box::pin(future::err(internal_err(format!(
-                        "eth api balance get_pending_balance error:{:?}",
-                        e.to_string()
-                    ))));
-                }
             }
-        };
 
-        let height = match block_number_to_height(number, self.getter.clone()) {
-            Ok(h) => h,
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api balance block_number_to_height error:{:?}",
+            let getter_clone = getter.clone();
+            let height = tokio::task::spawn_blocking(move || {
+                block_number_to_height(number_clone, getter_clone)
+            })
+            .await
+            .map_err(|e| {
+                internal_err(format!(
+                    "eth api balance block_number_to_height error: {:?}",
                     e.to_string()
-                ))));
-            }
-        };
+                ))
+            })?
+            .map_err(|e| {
+                internal_err(format!(
+                    "eth api balance block_number_to_height error: {:?}",
+                    e.to_string()
+                ))
+            })?;
 
-        match self.getter.get_balance(height, address) {
-            Ok(balance) => Box::pin(future::ok(balance)),
-            Err(e) => Box::pin(future::err(internal_err(format!(
-                "eth api balance get_balance:{:?}",
-                e.to_string()
-            )))),
-        }
+            let result = tokio::task::spawn_blocking(move || getter.get_balance(height, address))
+                .await
+                .map_err(|e| {
+                    internal_err(format!(
+                        "eth api balance get_balance error: {:?}",
+                        e.to_string()
+                    ))
+                })?;
+
+            match result {
+                Ok(balance) => Ok(balance),
+                Err(e) => Err(internal_err(format!(
+                    "eth api balance get_balance error: {:?}",
+                    e.to_string()
+                ))),
+            }
+        })
     }
 
     fn send_transaction(&self, _: TransactionRequest) -> BoxFuture<Result<H256>> {
