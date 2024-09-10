@@ -367,47 +367,66 @@ impl EthApi for EthService {
 
     fn author(&self) -> BoxFuture<Result<H160>> {
         log::info!(target: "eth api", "author");
-        let height = match self.getter.latest_height() {
-            Ok(h) => h,
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api author latest_height error:{:?}",
-                    e.to_string()
-                ))));
-            }
-        };
-        let hash = match self.getter.get_block_hash_by_height(U256::from(height)) {
-            Ok(value) => {
-                if let Some(hash) = value {
-                    hash
-                } else {
-                    return Box::pin(future::ok(H160::default()));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api author get_block_hash_by_height error:{:?}",
-                    e.to_string()
-                ))));
-            }
-        };
+        let getter = self.getter.clone();
 
-        let block = match self.getter.get_block_by_hash(hash) {
-            Ok(value) => {
-                if let Some(hash_index) = value {
-                    hash_index
-                } else {
-                    return Box::pin(future::ok(H160::default()));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api author get_block_by_hash error:{:?}",
+        Box::pin(async move {
+            let getter_clone = getter.clone();
+            let height = tokio::task::spawn_blocking(move || getter_clone.latest_height())
+                .await
+                .map_err(|e| {
+                    internal_err(format!(
+                        "eth api author latest_height error: {:?}",
+                        e.to_string()
+                    ))
+                })?
+                .map_err(|e| {
+                    internal_err(format!(
+                        "eth api author latest_height error: {:?}",
+                        e.to_string()
+                    ))
+                })?;
+
+            let getter_clone = getter.clone();
+            let hash = tokio::task::spawn_blocking(move || {
+                getter_clone.get_block_hash_by_height(U256::from(height))
+            })
+            .await
+            .map_err(|e| {
+                internal_err(format!(
+                    "eth api author get_block_hash_by_height error: {:?}",
                     e.to_string()
-                ))));
-            }
-        };
-        Box::pin(future::ok(block.header.beneficiary))
+                ))
+            })?
+            .unwrap_or_else(|_| Some(H256::default()));
+
+            // hash always has a default value so unwrap here is safe
+            let hash = hash.unwrap();
+
+            let block =
+                match tokio::task::spawn_blocking(move || getter.get_block_by_hash(hash)).await {
+                    Ok(Ok(Some(value))) => value,
+
+                    Ok(Ok(None)) => {
+                        return Ok(H160::default());
+                    }
+
+                    Ok(Err(e)) => {
+                        return Err(internal_err(format!(
+                            "eth api author get_block_by_hash error: {:?}",
+                            e.to_string()
+                        )));
+                    }
+
+                    Err(e) => {
+                        return Err(internal_err(format!(
+                            "eth api spawn_blocking error: {:?}",
+                            e.to_string()
+                        )));
+                    }
+                };
+
+            Ok(block.header.beneficiary)
+        })
     }
 
     fn is_mining(&self) -> BoxFuture<Result<bool>> {
