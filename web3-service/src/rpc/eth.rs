@@ -748,9 +748,14 @@ impl EthApi for EthService {
         let getter = self.getter.clone();
 
         Box::pin(async move {
-            let block = tokio::task::block_in_place(move || getter.get_block_by_hash(hash))
+            let block = tokio::task::spawn_blocking(move || getter.get_block_by_hash(hash))
+            .await
             .map_err(|e| internal_err(format!(
-                "eth api block_transaction_count_by_hash block_in_place get_block_by_hash error:{:?}",
+                "eth api block_transaction_count_by_hash spawn_blocking get_block_by_hash error:{:?}",
+                e.to_string()
+            )))?
+            .map_err(|e| internal_err(format!(
+                "eth api block_transaction_count_by_hash get_block_by_hash error:{:?}",
                 e.to_string()
             )))?;
 
@@ -769,37 +774,71 @@ impl EthApi for EthService {
 
         Box::pin(async move {
             let getter_clone = getter.clone();
-            let height = tokio::task::block_in_place(move || {
+            let height_result = tokio::task::spawn_blocking(move || {
                 block_number_to_height(Some(number), getter_clone.clone()).map_err(|e| {
                     internal_err(format!(
                     "eth api block_transaction_count_by_number block_number_to_height error:{:?}",
                     e.to_string()
                 ))
                 })
-            })?;
+            })
+            .await;
+
+            let height = match height_result {
+                Ok(Ok(h)) => h,
+                Ok(Err(e)) => return Err(e),
+                Err(e) => return Err(internal_err(format!(
+                    "eth api block_transaction_count_by_number spawn_blocking block_number_to_height error:{:?}",
+                    e.to_string()
+                ))),
+            };
 
             let getter_clone = getter.clone();
-            let hash = tokio::task::block_in_place(move || {
-                getter_clone.get_block_hash_by_height(U256::from(height))
-            })
-            .map_err(|e| {
-                internal_err(format!(
+            let hash_result = tokio::task::spawn_blocking(move || {
+                getter_clone
+                    .get_block_hash_by_height(U256::from(height))
+                    .map_err(|e| {
+                        internal_err(format!(
                     "eth api block_transaction_count_by_number get_block_hash_by_height error:{:?}",
                     e.to_string()
                 ))
-            })?
-            .ok_or_else(|| internal_err("block hash not found"))?;
+                    })
+            })
+            .await;
 
-            let block = tokio::task::block_in_place(move || getter.get_block_by_hash(hash))
-                .map_err(|e| {
-                    internal_err(format!(
-                        "eth api block_transaction_count_by_number get_block_by_hash error:{:?}",
-                        e.to_string()
-                    ))
-                })?
-                .ok_or_else(|| internal_err("block not found"))?;
+            let hash = match hash_result {
+                Ok(Ok(h)) => h,
+                Ok(Err(e)) => return Err(e),
+                Err(e) => return Err(internal_err(format!(
+                    "eth api block_transaction_count_by_number spawn_blocking get_block_hash_by_height error:{:?}",
+                    e.to_string()
+                ))),
+            };
 
-            Ok(Some(U256::from(block.transactions.len())))
+            let hash = match hash {
+                Some(h) => h,
+                None => return Ok(None),
+            };
+
+            let block_result =
+                tokio::task::spawn_blocking(move || getter.get_block_by_hash(hash)).await;
+
+            let block = match block_result {
+                Ok(Ok(b)) => b,
+                Ok(Err(e)) => return Err(internal_err(format!(
+                    "eth api block_transaction_count_by_number spawn_blocking get_block_by_hash error:{:?}",
+                    e.to_string()
+                ))),
+                Err(e) => return Err(internal_err(format!(
+                    "eth api block_transaction_count_by_number spawn_blocking get_block_by_hash error:{:?}",
+                    e.to_string()
+                ))),
+            };
+
+            match block {
+                Some(b) => Ok(Some(U256::from(b.transactions.len()))),
+                None => Ok(None),
+            }
         })
     }
 
@@ -820,37 +859,79 @@ impl EthApi for EthService {
             return Box::pin(future::ok(Bytes::new(b"fra".to_vec())));
         }
 
-        if let Some(BlockNumber::Pending) = number {
-            match self.getter.get_pending_byte_code(address) {
-                Ok(byte_code) => {
-                    if let Some(code) = byte_code {
-                        return Box::pin(future::ok(code.into()));
+        let getter = self.getter.clone();
+        Box::pin(async move {
+            let getter_clone = getter.clone();
+            if let Some(BlockNumber::Pending) = number {
+                let byte_code_result = tokio::task::spawn_blocking(move || {
+                    getter_clone.get_pending_byte_code(address).map_err(|e| {
+                        internal_err(format!(
+                            "eth api code_at get_pending_byte_code error:{:?}",
+                            e.to_string()
+                        ))
+                    })
+                })
+                .await;
+
+                let byte_code = match byte_code_result {
+                    Ok(Ok(code)) => code,
+                    Ok(Err(e)) => return Err(e),
+                    Err(e) => {
+                        return Err(internal_err(format!(
+                            "eth api code_at spawn_blocking get_pending_byte_code error:{:?}",
+                            e.to_string()
+                        )))
                     }
+                };
+
+                if let Some(code) = byte_code {
+                    return Ok(code.into());
+                } else {
+                    return Ok(Bytes::new(vec![]));
                 }
-                Err(e) => {
-                    return Box::pin(future::err(internal_err(format!(
-                        "eth api code_at get_pending_byte_code error:{:?}",
+            };
+
+            let getter_clone = getter.clone();
+            let height_result = tokio::task::spawn_blocking(move || {
+                block_number_to_height(number, getter_clone).map_err(|e| {
+                    internal_err(format!(
+                        "eth api code_at block_number_to_height error:{:?}",
                         e.to_string()
-                    ))));
+                    ))
+                })
+            })
+            .await;
+
+            let height = match height_result {
+                Ok(Ok(h)) => h,
+                Ok(Err(e)) => return Err(e),
+                Err(e) => {
+                    return Err(internal_err(format!(
+                        "eth api code_at spawn_blocking block_number_to_height error:{:?}",
+                        e.to_string()
+                    )))
                 }
-            }
-        };
-        let height = match block_number_to_height(number, self.getter.clone()) {
-            Ok(h) => h,
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api code_at block_number_to_height error:{:?}",
+            };
+
+            let code_result = tokio::task::spawn_blocking(move || {
+                getter.get_byte_code(height, address).map_err(|e| {
+                    internal_err(format!(
+                        "eth api code_at get_byte_code error:{:?}",
+                        e.to_string()
+                    ))
+                })
+            })
+            .await;
+
+            match code_result {
+                Ok(Ok(code)) => Ok(code.into()),
+                Ok(Err(e)) => Err(e),
+                Err(e) => Err(internal_err(format!(
+                    "eth api code_at spawn_blocking get_byte_code error:{:?}",
                     e.to_string()
-                ))));
+                ))),
             }
-        };
-        match self.getter.get_byte_code(height, address) {
-            Ok(code) => Box::pin(future::ok(code.into())),
-            Err(e) => Box::pin(future::err(internal_err(format!(
-                "eth api code_at get_byte_code error:{:?}",
-                e.to_string()
-            )))),
-        }
+        })
     }
 
     fn send_raw_transaction(&self, bytes: Bytes) -> BoxFuture<Result<H256>> {
