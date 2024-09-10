@@ -993,72 +993,131 @@ impl EthApi for EthService {
     ) -> BoxFuture<Result<U256>> {
         log::info!(target: "eth api", "estimate_gas request:{:?} number:{:?}", &request, &number);
         let is_pending = matches!(number, Some(BlockNumber::Pending));
+        let getter = self.getter.clone();
+        let gas_price = self.gas_price;
+        let chain_id = self.chain_id;
+        let tendermint_url = self.tendermint_url.clone();
 
-        let height = match block_number_to_height(number, self.getter.clone()) {
-            Ok(h) => h,
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api estimate_gas block_number_to_height error:{:?}",
-                    e.to_string()
-                ))));
-            }
-        };
-        let block = match self.getter.get_block_hash_by_height(U256::from(height)) {
-            Ok(value) => {
-                if let Some(hash) = value {
-                    match self.getter.get_block_by_hash(hash) {
-                        Ok(value) => value,
-                        Err(e) => {
-                            return Box::pin(future::err(internal_err(format!(
+        Box::pin(async move {
+            let getter_clone = getter.clone();
+            let height_result = tokio::task::spawn_blocking(move || {
+                block_number_to_height(number, getter_clone).map_err(|e| {
+                    internal_err(format!(
+                        "eth api estimate_gas block_number_to_height error:{:?}",
+                        e.to_string()
+                    ))
+                })
+            })
+            .await;
+
+            let height = match height_result {
+                Ok(Ok(h)) => h,
+                Ok(Err(e)) => return Err(e),
+                Err(e) => {
+                    return Err(internal_err(format!(
+                        "eth api estimate_gas spawn_blocking block_number_to_height error:{:?}",
+                        e.to_string()
+                    )))
+                }
+            };
+
+            let getter_clone = getter.clone();
+            let block_result = tokio::task::spawn_blocking(move || {
+                getter_clone
+                    .get_block_hash_by_height(U256::from(height))
+                    .map_err(|e| {
+                        internal_err(format!(
+                            "eth api estimate_gas get_block_hash_by_height error:{:?}",
+                            e.to_string()
+                        ))
+                    })
+            })
+            .await;
+
+            let hash = match block_result {
+                Ok(Ok(hash)) => hash,
+                Ok(Ok(None)) => None,
+                Ok(Err(e)) => return Err(e),
+                Err(e) => {
+                    return Err(internal_err(format!(
+                        "eth api estimate_gas spawn_blocking get_block_hash_by_height error:{:?}",
+                        e.to_string()
+                    )))
+                }
+            };
+
+            let block_result = match hash {
+                Some(h) => {
+                    let getter_clone = getter.clone();
+                    tokio::task::spawn_blocking(move || {
+                        getter_clone.get_block_by_hash(h).map_err(|e| {
+                            internal_err(format!(
                                 "eth api estimate_gas get_block_by_hash error:{:?}",
                                 e.to_string()
-                            ))));
-                        }
-                    }
-                } else {
-                    None
+                            ))
+                        })
+                    })
+                    .await
                 }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api estimate_gas get_block_by_hash error:{:?}",
-                    e.to_string()
-                ))));
-            }
-        };
-        let mut highest = if let Some(gas) = request.gas {
-            gas
-        } else if let Some(b) = block {
-            b.header.gas_limit
-        } else {
-            U256::from(u32::max_value())
-        };
+                None => Ok(Ok(None)),
+            };
 
-        // recap gas limit according to account balance
-        if let Some(from) = request.from {
-            let gas_price = request.gas_price.unwrap_or_default();
-            if gas_price > U256::zero() {
-                let balance = match self.getter.get_balance(height, from) {
-                    Ok(balance) => balance,
-                    Err(e) => {
-                        return Box::pin(future::err(internal_err(format!(
-                            "eth api estimate_gas get_balance error:{:?}",
-                            e.to_string()
-                        ))));
-                    }
-                };
-                let mut available = balance;
-                if let Some(value) = request.value {
-                    if value > available {
-                        return Box::pin(future::err(internal_err(
-                            "eth api estimate_gas insufficient funds for transfer",
-                        )));
-                    }
-                    available -= value;
+            let block = match block_result {
+                Ok(Ok(b)) => b,
+                Ok(Err(e)) => return Err(e),
+                Err(e) => {
+                    return Err(internal_err(format!(
+                        "eth api estimate_gas spawn_blocking get_block_by_hash error:{:?}",
+                        e.to_string()
+                    )))
                 }
-                let allowance = available / gas_price;
-                if highest < allowance {
-                    log::warn!(
+            };
+
+            let mut highest = if let Some(gas) = request.gas {
+                gas
+            } else if let Some(b) = block {
+                b.header.gas_limit
+            } else {
+                U256::from(u32::MAX)
+            };
+
+            if let Some(from) = request.from {
+                let gas_price = request.gas_price.unwrap_or_default();
+                if gas_price > U256::zero() {
+                    let getter_clone = getter.clone();
+                    let balance_result = tokio::task::spawn_blocking(move || {
+                        getter_clone.get_balance(height, from).map_err(|e| {
+                            internal_err(format!(
+                                "eth api estimate_gas get_balance error:{:?}",
+                                e.to_string()
+                            ))
+                        })
+                    })
+                    .await;
+
+                    let balance = match balance_result {
+                        Ok(Ok(b)) => b,
+                        Ok(Err(e)) => return Err(e),
+                        Err(e) => {
+                            return Err(internal_err(format!(
+                                "eth api estimate_gas spawn_blocking get_balance error:{:?}",
+                                e.to_string()
+                            )))
+                        }
+                    };
+
+                    let mut available = balance;
+                    if let Some(value) = request.value {
+                        if value > available {
+                            return Err(internal_err(
+                                "eth api estimate_gas insufficient funds for transfer",
+                            ));
+                        }
+                        available -= value;
+                    }
+                    let allowance = available / gas_price;
+                    if highest < allowance {
+                        log::warn!(
                         "Gas estimation capped by limited funds original {} balance {} sent {} feecap {} fundable {}",
                         highest,
                         balance,
@@ -1066,63 +1125,63 @@ impl EthApi for EthService {
                         gas_price,
                         allowance
                     );
-                    highest = allowance;
+                        highest = allowance;
+                    }
                 }
             }
-        }
 
-        let execute_call_or_create =
-            move |request: CallRequest, gas_limit| -> (Vec<u8>, ExitReason, U256) {
-                let data = request.data.map(|d| d.0).unwrap_or_default();
-                let config = evm::Config::istanbul();
+            let execute_call_or_create =
+                |request: CallRequest, gas_limit: u64| -> (Vec<u8>, ExitReason, U256) {
+                    let data = request.data.map(|d| d.0).unwrap_or_default();
+                    let config = evm::Config::istanbul();
+                    let metadata = StackSubstateMetadata::new(gas_limit, &config);
+                    let precompile_set = Web3EvmPrecompiles::new(height);
 
-                let metadata = StackSubstateMetadata::new(gas_limit, &config);
-                let precompile_set = Web3EvmPrecompiles::new(height);
-                let mut executor = StackExecutor::new_with_precompiles(
-                    Web3EvmStackstate::new(
-                        U256::from(self.gas_price),
-                        self.chain_id,
-                        height,
-                        is_pending,
-                        request.from.unwrap_or_default(),
-                        self.getter.clone(),
-                        self.tendermint_url.as_str(),
-                        metadata,
-                    ),
-                    &config,
-                    &precompile_set,
-                );
-                let access_list = Vec::new();
-
-                if let Some(to) = request.to {
-                    let (exit_reason, data) = executor.transact_call(
-                        request.from.unwrap_or_default(),
-                        to,
-                        request.value.unwrap_or_default(),
-                        data,
-                        gas_limit,
-                        access_list,
+                    let mut executor = StackExecutor::new_with_precompiles(
+                        Web3EvmStackstate::new(
+                            U256::from(gas_price),
+                            chain_id,
+                            height,
+                            is_pending,
+                            request.from.unwrap_or_default(),
+                            getter.clone(),
+                            tendermint_url.as_str(),
+                            metadata,
+                        ),
+                        &config,
+                        &precompile_set,
                     );
-                    (data, exit_reason, U256::from(executor.used_gas()))
-                } else {
-                    let (exit_reason, data) = executor.transact_create(
-                        request.from.unwrap_or_default(),
-                        request.value.unwrap_or_default(),
-                        data,
-                        gas_limit,
-                        access_list,
-                    );
-                    (data, exit_reason, U256::from(executor.used_gas()))
-                }
-            };
+                    let access_list = Vec::new();
 
-        let (data, exit_reason, used_gas) =
-            execute_call_or_create(request.clone(), highest.low_u64());
+                    if let Some(to) = request.to {
+                        let (exit_reason, data) = executor.transact_call(
+                            request.from.unwrap_or_default(),
+                            to,
+                            request.value.unwrap_or_default(),
+                            data,
+                            gas_limit,
+                            access_list,
+                        );
+                        (data, exit_reason, U256::from(executor.used_gas()))
+                    } else {
+                        let (exit_reason, data) = executor.transact_create(
+                            request.from.unwrap_or_default(),
+                            request.value.unwrap_or_default(),
+                            data,
+                            gas_limit,
+                            access_list,
+                        );
+                        (data, exit_reason, U256::from(executor.used_gas()))
+                    }
+                };
 
-        if let Err(e) = Self::error_on_execution_failure(&exit_reason, &data) {
-            return Box::pin(future::err(e));
-        }
-        {
+            let (data, exit_reason, used_gas) =
+                execute_call_or_create(request.clone(), highest.low_u64());
+
+            if let Err(e) = Self::error_on_execution_failure(&exit_reason, &data) {
+                return Err(e);
+            }
+
             let mut lowest = U256::from(21_000);
             let mut mid = std::cmp::min(used_gas * 3, (highest + lowest) / 2);
             let mut previous_highest = highest;
@@ -1133,7 +1192,7 @@ impl EthApi for EthService {
                     ExitReason::Succeed(_) => {
                         highest = mid;
                         if (previous_highest - highest) * 10 / previous_highest < U256::one() {
-                            return Box::pin(future::ok(highest));
+                            return Ok(highest);
                         }
                         previous_highest = highest;
                     }
@@ -1142,14 +1201,172 @@ impl EthApi for EthService {
                     }
                     other => {
                         if let Err(e) = Self::error_on_execution_failure(&other, &data) {
-                            return Box::pin(future::err(e));
+                            return Err(e);
                         }
                     }
                 }
                 mid = (highest + lowest) / 2;
             }
-        }
-        Box::pin(future::ok(used_gas))
+
+            Ok(used_gas)
+        })
+
+        // let height = match block_number_to_height(number, self.getter.clone()) {
+        //     Ok(h) => h,
+        //     Err(e) => {
+        //         return Box::pin(future::err(internal_err(format!(
+        //             "eth api estimate_gas block_number_to_height error:{:?}",
+        //             e.to_string()
+        //         ))));
+        //     }
+        // };
+        // let block = match self.getter.get_block_hash_by_height(U256::from(height)) {
+        //     Ok(value) => {
+        //         if let Some(hash) = value {
+        //             match self.getter.get_block_by_hash(hash) {
+        //                 Ok(value) => value,
+        //                 Err(e) => {
+        //                     return Box::pin(future::err(internal_err(format!(
+        //                         "eth api estimate_gas get_block_by_hash error:{:?}",
+        //                         e.to_string()
+        //                     ))));
+        //                 }
+        //             }
+        //         } else {
+        //             None
+        //         }
+        //     }
+        //     Err(e) => {
+        //         return Box::pin(future::err(internal_err(format!(
+        //             "eth api estimate_gas get_block_by_hash error:{:?}",
+        //             e.to_string()
+        //         ))));
+        //     }
+        // };
+        // let mut highest = if let Some(gas) = request.gas {
+        //     gas
+        // } else if let Some(b) = block {
+        //     b.header.gas_limit
+        // } else {
+        //     U256::from(u32::max_value())
+        // };
+
+        // // recap gas limit according to account balance
+        // if let Some(from) = request.from {
+        //     let gas_price = request.gas_price.unwrap_or_default();
+        //     if gas_price > U256::zero() {
+        //         let balance = match self.getter.get_balance(height, from) {
+        //             Ok(balance) => balance,
+        //             Err(e) => {
+        //                 return Box::pin(future::err(internal_err(format!(
+        //                     "eth api estimate_gas get_balance error:{:?}",
+        //                     e.to_string()
+        //                 ))));
+        //             }
+        //         };
+        //         let mut available = balance;
+        //         if let Some(value) = request.value {
+        //             if value > available {
+        //                 return Box::pin(future::err(internal_err(
+        //                     "eth api estimate_gas insufficient funds for transfer",
+        //                 )));
+        //             }
+        //             available -= value;
+        //         }
+        //         let allowance = available / gas_price;
+        //         if highest < allowance {
+        //             log::warn!(
+        //                 "Gas estimation capped by limited funds original {} balance {} sent {} feecap {} fundable {}",
+        //                 highest,
+        //                 balance,
+        //                 request.value.unwrap_or_default(),
+        //                 gas_price,
+        //                 allowance
+        //             );
+        //             highest = allowance;
+        //         }
+        //     }
+        // }
+
+        // let execute_call_or_create =
+        //     move |request: CallRequest, gas_limit| -> (Vec<u8>, ExitReason, U256) {
+        //         let data = request.data.map(|d| d.0).unwrap_or_default();
+        //         let config = evm::Config::istanbul();
+
+        //         let metadata = StackSubstateMetadata::new(gas_limit, &config);
+        //         let precompile_set = Web3EvmPrecompiles::new(height);
+        //         let mut executor = StackExecutor::new_with_precompiles(
+        //             Web3EvmStackstate::new(
+        //                 U256::from(self.gas_price),
+        //                 self.chain_id,
+        //                 height,
+        //                 is_pending,
+        //                 request.from.unwrap_or_default(),
+        //                 self.getter.clone(),
+        //                 self.tendermint_url.as_str(),
+        //                 metadata,
+        //             ),
+        //             &config,
+        //             &precompile_set,
+        //         );
+        //         let access_list = Vec::new();
+
+        //         if let Some(to) = request.to {
+        //             let (exit_reason, data) = executor.transact_call(
+        //                 request.from.unwrap_or_default(),
+        //                 to,
+        //                 request.value.unwrap_or_default(),
+        //                 data,
+        //                 gas_limit,
+        //                 access_list,
+        //             );
+        //             (data, exit_reason, U256::from(executor.used_gas()))
+        //         } else {
+        //             let (exit_reason, data) = executor.transact_create(
+        //                 request.from.unwrap_or_default(),
+        //                 request.value.unwrap_or_default(),
+        //                 data,
+        //                 gas_limit,
+        //                 access_list,
+        //             );
+        //             (data, exit_reason, U256::from(executor.used_gas()))
+        //         }
+        //     };
+
+        // let (data, exit_reason, used_gas) =
+        //     execute_call_or_create(request.clone(), highest.low_u64());
+
+        // if let Err(e) = Self::error_on_execution_failure(&exit_reason, &data) {
+        //     return Box::pin(future::err(e));
+        // }
+        // {
+        //     let mut lowest = U256::from(21_000);
+        //     let mut mid = std::cmp::min(used_gas * 3, (highest + lowest) / 2);
+        //     let mut previous_highest = highest;
+
+        //     while (highest - lowest) > U256::one() {
+        //         let (data, exit_reason, _) = execute_call_or_create(request.clone(), mid.low_u64());
+        //         match exit_reason {
+        //             ExitReason::Succeed(_) => {
+        //                 highest = mid;
+        //                 if (previous_highest - highest) * 10 / previous_highest < U256::one() {
+        //                     return Box::pin(future::ok(highest));
+        //                 }
+        //                 previous_highest = highest;
+        //             }
+        //             ExitReason::Revert(_) | ExitReason::Error(ExitError::OutOfGas) => {
+        //                 lowest = mid;
+        //             }
+        //             other => {
+        //                 if let Err(e) = Self::error_on_execution_failure(&other, &data) {
+        //                     return Box::pin(future::err(e));
+        //                 }
+        //             }
+        //         }
+        //         mid = (highest + lowest) / 2;
+        //     }
+        // }
+        // Box::pin(future::ok(used_gas))
     }
 
     fn transaction_by_hash(&self, tx_hash: H256) -> BoxFuture<Result<Option<Transaction>>> {
