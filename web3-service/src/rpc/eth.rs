@@ -1369,76 +1369,103 @@ impl EthApi for EthService {
         index: Index,
     ) -> BoxFuture<Result<Option<Transaction>>> {
         log::info!(target: "eth api", "transaction_by_block_number_and_index number:{:?} index:{:?}", &number, &index);
-        let height = match block_number_to_height(Some(number), self.getter.clone()) {
-            Ok(h) => h,
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api transaction_by_block_number_and_index block_number_to_height error:{:?}",
-                e.to_string()
-                ))));
-            }
-        };
-        let hash = match self.getter.get_block_hash_by_height(U256::from(height)) {
-            Ok(value) => {
-                if let Some(hash) = value {
-                    hash
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api transaction_by_block_number_and_index get_block_hash_by_height error:{:?}",
-                e.to_string()
-                ))));
-            }
-        };
+        let getter = self.getter.clone();
 
-        let block = match self.getter.get_block_by_hash(hash) {
-            Ok(value) => {
-                if let Some(hash_index) = value {
-                    hash_index
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
+        Box::pin(async move {
+            let getter_clone = getter.clone();
+            let height_result = tokio::task::spawn_blocking(move || {
+            block_number_to_height(Some(number), getter_clone .clone())
+                .map_err(|e| internal_err(format!(
+                    "eth api transaction_by_block_number_and_index block_number_to_height error:{:?}",
+                    e.to_string()
+                )))
+        })
+        .await
+        .map_err(|e| internal_err(format!(
+            "eth api transaction_by_block_number_and_index spawn_blocking block_number_to_height error:{:?}",
+            e.to_string()
+        )))?;
+
+            let height = match height_result {
+                Ok(h) => h,
+                Err(e) => return Err(e),
+            };
+
+            let getter_clone = getter.clone();
+            let hash_result = tokio::task::spawn_blocking(move || {
+            getter_clone .get_block_hash_by_height(U256::from(height))
+                .map_err(|e| internal_err(format!(
+                    "eth api transaction_by_block_number_and_index get_block_hash_by_height error:{:?}",
+                    e.to_string()
+                )))
+        })
+        .await
+        .map_err(|e| internal_err(format!(
+            "eth api transaction_by_block_number_and_index spawn_blocking get_block_hash_by_height error:{:?}",
+            e.to_string()
+        )))?;
+
+            let hash = match hash_result {
+                Ok(Some(h)) => h,
+                Ok(None) => return Ok(None),
+                Err(e) => return Err(e),
+            };
+
+            let getter_clone = getter.clone();
+            let block_result = tokio::task::spawn_blocking(move || {
+            getter_clone .get_block_by_hash(hash)
+                .map_err(|e| internal_err(format!(
                     "eth api transaction_by_block_number_and_index get_block_by_hash error:{:?}",
                     e.to_string()
-                ))));
-            }
-        };
-        let transaction = if let Some(hash_index) = block.transactions.get(index.value()) {
-            hash_index
-        } else {
-            return Box::pin(future::ok(None));
-        };
-        let transaction_statuses = match self.getter.get_transaction_status_by_block_hash(hash) {
-            Ok(value) => {
-                if let Some(statuses) = value {
-                    statuses
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
+                )))
+        })
+        .await
+        .map_err(|e| internal_err(format!(
+            "eth api transaction_by_block_number_and_index spawn_blocking get_block_by_hash error:{:?}",
+            e.to_string()
+        )))?;
+
+            let block = match block_result {
+                Ok(Some(b)) => b,
+                Ok(None) => return Ok(None),
+                Err(e) => return Err(e),
+            };
+
+            let statuses_result = tokio::task::spawn_blocking(move || {
+            getter.get_transaction_status_by_block_hash(hash)
+                .map_err(|e| internal_err(format!(
                     "eth api transaction_by_block_number_and_index get_transaction_status_by_block_hash error:{:?}",
-                e.to_string()
-                ))));
-            }
-        };
-        let transaction_status = if let Some(status) = transaction_statuses.get(index.value()) {
-            status
-        } else {
-            return Box::pin(future::ok(None));
-        };
-        Box::pin(future::ok(Some(Self::transaction_build(
-            &block,
-            transaction,
-            transaction_status,
-        ))))
+                    e.to_string()
+                )))
+        })
+        .await
+        .map_err(|e| internal_err(format!(
+            "eth api transaction_by_block_number_and_index spawn_blocking get_transaction_status_by_block_hash error:{:?}",
+            e.to_string()
+        )))?;
+
+            let transaction_statuses = match statuses_result {
+                Ok(Some(statuses)) => statuses,
+                Ok(None) => return Ok(None),
+                Err(e) => return Err(e),
+            };
+
+            let transaction = match block.transactions.get(index.value() as usize) {
+                Some(tx) => tx,
+                None => return Ok(None),
+            };
+
+            let transaction_status = match transaction_statuses.get(index.value() as usize) {
+                Some(status) => status,
+                None => return Ok(None),
+            };
+
+            Ok(Some(Self::transaction_build(
+                &block,
+                transaction,
+                transaction_status,
+            )))
+        })
     }
 
     fn transaction_receipt(&self, tx_hash: H256) -> BoxFuture<Result<Option<Receipt>>> {
