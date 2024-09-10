@@ -1210,227 +1210,91 @@ impl EthApi for EthService {
 
             Ok(used_gas)
         })
-
-        // let height = match block_number_to_height(number, self.getter.clone()) {
-        //     Ok(h) => h,
-        //     Err(e) => {
-        //         return Box::pin(future::err(internal_err(format!(
-        //             "eth api estimate_gas block_number_to_height error:{:?}",
-        //             e.to_string()
-        //         ))));
-        //     }
-        // };
-        // let block = match self.getter.get_block_hash_by_height(U256::from(height)) {
-        //     Ok(value) => {
-        //         if let Some(hash) = value {
-        //             match self.getter.get_block_by_hash(hash) {
-        //                 Ok(value) => value,
-        //                 Err(e) => {
-        //                     return Box::pin(future::err(internal_err(format!(
-        //                         "eth api estimate_gas get_block_by_hash error:{:?}",
-        //                         e.to_string()
-        //                     ))));
-        //                 }
-        //             }
-        //         } else {
-        //             None
-        //         }
-        //     }
-        //     Err(e) => {
-        //         return Box::pin(future::err(internal_err(format!(
-        //             "eth api estimate_gas get_block_by_hash error:{:?}",
-        //             e.to_string()
-        //         ))));
-        //     }
-        // };
-        // let mut highest = if let Some(gas) = request.gas {
-        //     gas
-        // } else if let Some(b) = block {
-        //     b.header.gas_limit
-        // } else {
-        //     U256::from(u32::max_value())
-        // };
-
-        // // recap gas limit according to account balance
-        // if let Some(from) = request.from {
-        //     let gas_price = request.gas_price.unwrap_or_default();
-        //     if gas_price > U256::zero() {
-        //         let balance = match self.getter.get_balance(height, from) {
-        //             Ok(balance) => balance,
-        //             Err(e) => {
-        //                 return Box::pin(future::err(internal_err(format!(
-        //                     "eth api estimate_gas get_balance error:{:?}",
-        //                     e.to_string()
-        //                 ))));
-        //             }
-        //         };
-        //         let mut available = balance;
-        //         if let Some(value) = request.value {
-        //             if value > available {
-        //                 return Box::pin(future::err(internal_err(
-        //                     "eth api estimate_gas insufficient funds for transfer",
-        //                 )));
-        //             }
-        //             available -= value;
-        //         }
-        //         let allowance = available / gas_price;
-        //         if highest < allowance {
-        //             log::warn!(
-        //                 "Gas estimation capped by limited funds original {} balance {} sent {} feecap {} fundable {}",
-        //                 highest,
-        //                 balance,
-        //                 request.value.unwrap_or_default(),
-        //                 gas_price,
-        //                 allowance
-        //             );
-        //             highest = allowance;
-        //         }
-        //     }
-        // }
-
-        // let execute_call_or_create =
-        //     move |request: CallRequest, gas_limit| -> (Vec<u8>, ExitReason, U256) {
-        //         let data = request.data.map(|d| d.0).unwrap_or_default();
-        //         let config = evm::Config::istanbul();
-
-        //         let metadata = StackSubstateMetadata::new(gas_limit, &config);
-        //         let precompile_set = Web3EvmPrecompiles::new(height);
-        //         let mut executor = StackExecutor::new_with_precompiles(
-        //             Web3EvmStackstate::new(
-        //                 U256::from(self.gas_price),
-        //                 self.chain_id,
-        //                 height,
-        //                 is_pending,
-        //                 request.from.unwrap_or_default(),
-        //                 self.getter.clone(),
-        //                 self.tendermint_url.as_str(),
-        //                 metadata,
-        //             ),
-        //             &config,
-        //             &precompile_set,
-        //         );
-        //         let access_list = Vec::new();
-
-        //         if let Some(to) = request.to {
-        //             let (exit_reason, data) = executor.transact_call(
-        //                 request.from.unwrap_or_default(),
-        //                 to,
-        //                 request.value.unwrap_or_default(),
-        //                 data,
-        //                 gas_limit,
-        //                 access_list,
-        //             );
-        //             (data, exit_reason, U256::from(executor.used_gas()))
-        //         } else {
-        //             let (exit_reason, data) = executor.transact_create(
-        //                 request.from.unwrap_or_default(),
-        //                 request.value.unwrap_or_default(),
-        //                 data,
-        //                 gas_limit,
-        //                 access_list,
-        //             );
-        //             (data, exit_reason, U256::from(executor.used_gas()))
-        //         }
-        //     };
-
-        // let (data, exit_reason, used_gas) =
-        //     execute_call_or_create(request.clone(), highest.low_u64());
-
-        // if let Err(e) = Self::error_on_execution_failure(&exit_reason, &data) {
-        //     return Box::pin(future::err(e));
-        // }
-        // {
-        //     let mut lowest = U256::from(21_000);
-        //     let mut mid = std::cmp::min(used_gas * 3, (highest + lowest) / 2);
-        //     let mut previous_highest = highest;
-
-        //     while (highest - lowest) > U256::one() {
-        //         let (data, exit_reason, _) = execute_call_or_create(request.clone(), mid.low_u64());
-        //         match exit_reason {
-        //             ExitReason::Succeed(_) => {
-        //                 highest = mid;
-        //                 if (previous_highest - highest) * 10 / previous_highest < U256::one() {
-        //                     return Box::pin(future::ok(highest));
-        //                 }
-        //                 previous_highest = highest;
-        //             }
-        //             ExitReason::Revert(_) | ExitReason::Error(ExitError::OutOfGas) => {
-        //                 lowest = mid;
-        //             }
-        //             other => {
-        //                 if let Err(e) = Self::error_on_execution_failure(&other, &data) {
-        //                     return Box::pin(future::err(e));
-        //                 }
-        //             }
-        //         }
-        //         mid = (highest + lowest) / 2;
-        //     }
-        // }
-        // Box::pin(future::ok(used_gas))
     }
 
     fn transaction_by_hash(&self, tx_hash: H256) -> BoxFuture<Result<Option<Transaction>>> {
         log::info!(target: "eth api", "transaction_by_hash tx_hash:{:?}", &tx_hash);
-        let (hash, index) = match self.getter.get_transaction_index_by_tx_hash(tx_hash) {
-            Ok(value) => {
-                if let Some(hash_index) = value {
-                    hash_index
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
+        let getter = self.getter.clone();
+
+        Box::pin(async move {
+            let getter_clone = getter.clone();
+            let index_result = tokio::task::spawn_blocking(move || {
+            getter_clone .get_transaction_index_by_tx_hash(tx_hash)
+                .map_err(|e| internal_err(format!(
                     "eth api transaction_by_hash get_transaction_index_by_tx_hash error:{:?}",
                     e.to_string()
-                ))));
-            }
-        };
-        let block = match self.getter.get_block_by_hash(hash) {
-            Ok(value) => {
-                if let Some(hash_index) = value {
-                    hash_index
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api transaction_by_hash get_block_by_hash error:{:?}",
+                )))
+        })
+        .await
+        .map_err(|e| internal_err(format!(
+            "eth api transaction_by_hash spawn_blocking get_transaction_index_by_tx_hash error:{:?}",
+            e.to_string()
+        )))?;
+
+            let (hash, index) = match index_result {
+                Ok(Some(value)) => value,
+                Ok(None) => return Ok(None),
+                Err(e) => return Err(e),
+            };
+
+            let getter_clone = getter.clone();
+            let block_result = tokio::task::spawn_blocking(move || {
+                getter_clone.get_block_by_hash(hash).map_err(|e| {
+                    internal_err(format!(
+                        "eth api transaction_by_hash get_block_by_hash error:{:?}",
+                        e.to_string()
+                    ))
+                })
+            })
+            .await
+            .map_err(|e| {
+                internal_err(format!(
+                    "eth api transaction_by_hash spawn_blocking get_block_by_hash error:{:?}",
                     e.to_string()
-                ))));
-            }
-        };
-        let transaction = if let Some(hash_index) = block.transactions.get(index as usize) {
-            hash_index
-        } else {
-            return Box::pin(future::ok(None));
-        };
-        let transaction_statuses = match self.getter.get_transaction_status_by_block_hash(hash) {
-            Ok(value) => {
-                if let Some(statuses) = value {
-                    statuses
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
+                ))
+            })?;
+
+            let block = match block_result {
+                Ok(Some(b)) => b,
+                Ok(None) => return Ok(None),
+                Err(e) => return Err(e),
+            };
+
+            let statuses_result = tokio::task::spawn_blocking(move || {
+            getter.get_transaction_status_by_block_hash(hash)
+                .map_err(|e| internal_err(format!(
                     "eth api transaction_by_hash get_transaction_status_by_block_hash error:{:?}",
                     e.to_string()
-                ))));
-            }
-        };
-        let transaction_status = if let Some(status) = transaction_statuses.get(index as usize) {
-            status
-        } else {
-            return Box::pin(future::ok(None));
-        };
-        Box::pin(future::ok(Some(Self::transaction_build(
-            &block,
-            transaction,
-            transaction_status,
-        ))))
+                )))
+        })
+        .await
+        .map_err(|e| internal_err(format!(
+            "eth api transaction_by_hash spawn_blocking get_transaction_status_by_block_hash error:{:?}",
+            e.to_string()
+        )))?;
+
+            let transaction_statuses = match statuses_result {
+                Ok(Some(statuses)) => statuses,
+                Ok(None) => return Ok(None),
+                Err(e) => return Err(e),
+            };
+
+            let transaction = match block.transactions.get(index as usize) {
+                Some(tx) => tx,
+                None => return Ok(None),
+            };
+
+            let transaction_status = match transaction_statuses.get(index as usize) {
+                Some(status) => status,
+                None => return Ok(None),
+            };
+
+            Ok(Some(Self::transaction_build(
+                &block,
+                transaction,
+                transaction_status,
+            )))
+        })
     }
 
     fn transaction_by_block_hash_and_index(
