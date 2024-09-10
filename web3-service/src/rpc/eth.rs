@@ -745,22 +745,19 @@ impl EthApi for EthService {
 
     fn block_transaction_count_by_hash(&self, hash: H256) -> BoxFuture<Result<Option<U256>>> {
         log::info!(target: "eth api", "block_transaction_count_by_hash hash:{:?}", &hash);
-        let block = match self.getter.get_block_by_hash(hash) {
-            Ok(value) => {
-                if let Some(hash_index) = value {
-                    hash_index
-                } else {
-                    return Box::pin(future::ok(None));
-                }
-            }
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api block_transaction_count_by_hash get_block_by_hash error:{:?}",
-                    e.to_string()
-                ))));
-            }
-        };
-        Box::pin(future::ok(Some(U256::from(block.transactions.len()))))
+        let getter = self.getter.clone();
+
+        Box::pin(async move {
+            let block = tokio::task::block_in_place(move || getter.get_block_by_hash(hash))
+            .map_err(|e| internal_err(format!(
+                "eth api block_transaction_count_by_hash block_in_place get_block_by_hash error:{:?}",
+                e.to_string()
+            )))?;
+
+            Ok(Some(U256::from(
+                block.map_or(0, |b| b.transactions.len() as u64),
+            )))
+        })
     }
 
     fn block_transaction_count_by_number(
