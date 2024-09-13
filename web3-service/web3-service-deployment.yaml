@@ -3,30 +3,85 @@ kind: Deployment
 metadata:
   labels:
     app: web3-service
-  name: web3-service
+  name: mainnet-web3-service-pg
   namespace: enterprise-web3
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: web3-service
+      env: mainnet
+      data: pg
   template:
     metadata:
       labels:
         app: web3-service
+        env: mainnet
+        data: pg
     spec:
       containers:
         - name: web3-service
-          image: 197320162446.dkr.ecr.us-west-2.amazonaws.com/web3-service:latest
+          image: ghcr.io/findoranetwork/enterprise-web3:web3-service-main-97682dc-1726194868354
+          env:
+            - name: WEB3_CONFIG_FILE_PATH
+              value: /web3-service/web3-service-config.toml
           ports:
             - containerPort: 8545
             - containerPort: 8546
           volumeMounts:
             - mountPath: /web3-service/web3-service-config.toml
               name: web3-service-config
+              subPath: web3-service-config.toml
+          #command: ["sh", "-c", "sleep 1000000"]
 
       restartPolicy: Always
       volumes:
         - name: web3-service-config
           configMap:
-            name: web3-service-config
+            name: mainnet-web3-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mainnet-web3-service-pg
+  namespace: enterprise-web3
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8545
+      targetPort: 8545
+    - name: ws
+      protocol: TCP
+      port: 8546
+      targetPort: 8546
+  selector:
+    app: web3-service
+    env: mainnet
+    data: pg
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mainnet-web3-service-pg-ingress
+  namespace: enterprise-web3
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/target-type: ip
+    kubernetes.io/ingress.class: alb
+spec:
+  rules:
+    - host: rpc-mainnet-pg.fra.tech
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mainnet-web3-service-pg
+                port:
+                  number: 8545
+

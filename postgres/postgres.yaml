@@ -1,0 +1,23 @@
+apiVersion: kubegres.reactive-tech.io/v1
+kind: Kubegres
+metadata:
+  name: web3-postgres-cluster
+  namespace: postgres
+
+spec:
+  replicas: 1
+  image: postgres:14.1
+  database:
+    size: 2000Gi
+  env:
+  - name: POSTGRES_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: web3-postgres-cluster-secret
+        key: superUserPassword
+
+  - name: POSTGRES_REPLICATION_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: web3-postgres-cluster-secret
+        key: replicationUserPassword

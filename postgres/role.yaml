@@ -1,0 +1,9 @@
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: postgres
+  name: allow-port-forward
+rules:
+- apiGroups: [""]
+  resources: ["services", "pods", "pods/portforward"]
+  verbs: ["get", "list", "create"]

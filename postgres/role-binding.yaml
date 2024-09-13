@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: allow-port-forward-role-binding
+  namespace: postgres
+subjects:
+- kind: Group
+  name: allow-port-forward
+  apiGroup: ""
+roleRef:
+  kind: Role
+  name: allow-port-forward
+  apiGroup: ""
