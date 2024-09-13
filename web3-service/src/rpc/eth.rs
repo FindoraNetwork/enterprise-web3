@@ -307,57 +307,73 @@ impl EthApi for EthService {
     fn call(&self, request: CallRequest, number: Option<BlockNumber>) -> BoxFuture<Result<Bytes>> {
         log::info!(target: "eth api", "call request:{:?} number:{:?}", &request, &number);
         let is_pending = matches!(number, Some(BlockNumber::Pending));
+        let getter = self.getter.clone();
+        let gas_price = self.gas_price;
+        let chain_id = self.chain_id;
+        let tendermint_url = self.tendermint_url.clone();
 
-        let height = match block_number_to_height(number, self.getter.clone()) {
-            Ok(h) => h,
-            Err(e) => {
-                return Box::pin(future::err(internal_err(format!(
-                    "eth api call block_number_to_height error:{:?}",
-                    e.to_string()
-                ))));
-            }
-        };
+        Box::pin(async move {
+            let ret = tokio::task::spawn_blocking(move || {
+                let height = match block_number_to_height(number, getter.clone()) {
+                    Ok(h) => h,
+                    Err(e) => {
+                        return Err(internal_err(format!(
+                            "eth api call block_number_to_height error:{:?}",
+                            e.to_string()
+                        )));
+                    }
+                };
 
-        let gas_limit = U256::from(u32::max_value()).as_u64();
-        let data = request.data.map(|d| d.0).unwrap_or_default();
-        let config = evm::Config::istanbul();
+                let gas_limit = U256::from(u32::max_value()).as_u64();
+                let data = request.data.map(|d| d.0).unwrap_or_default();
+                let config = evm::Config::istanbul();
 
-        let metadata = StackSubstateMetadata::new(gas_limit, &config);
-        let precompile_set = Web3EvmPrecompiles::new(height);
-        let mut executor = StackExecutor::new_with_precompiles(
-            Web3EvmStackstate::new(
-                U256::from(self.gas_price),
-                self.chain_id,
-                height,
-                is_pending,
-                request.from.unwrap_or_default(),
-                self.getter.clone(),
-                self.tendermint_url.as_str(),
-                metadata,
-            ),
-            &config,
-            &precompile_set,
-        );
-        let access_list = Vec::new();
+                let metadata = StackSubstateMetadata::new(gas_limit, &config);
+                let precompile_set = Web3EvmPrecompiles::new(height);
+                let mut executor = StackExecutor::new_with_precompiles(
+                    Web3EvmStackstate::new(
+                        U256::from(gas_price),
+                        chain_id,
+                        height,
+                        is_pending,
+                        request.from.unwrap_or_default(),
+                        getter.clone(),
+                        tendermint_url.as_str(),
+                        metadata,
+                    ),
+                    &config,
+                    &precompile_set,
+                );
+                let access_list = Vec::new();
 
-        if let Some(to) = request.to {
-            let (_, retv) = executor.transact_call(
-                request.from.unwrap_or_default(),
-                to,
-                request.value.unwrap_or_default(),
-                data,
-                gas_limit,
-                access_list,
-            );
-            Box::pin(future::ok(Bytes(retv)))
-        } else {
-            let err = jsonrpc_core::Error {
-                code: jsonrpc_core::ErrorCode::InvalidParams,
-                message: "to address no find".to_string(),
-                data: None,
-            };
-            Box::pin(future::err(err))
-        }
+                match request.to {
+                    Some(to) => {
+                        let (_, retv) = executor.transact_call(
+                            request.from.unwrap_or_default(),
+                            to,
+                            request.value.unwrap_or_default(),
+                            data,
+                            gas_limit,
+                            access_list,
+                        );
+                        Ok(Bytes(retv))
+                    }
+                    None => {
+                        let err = jsonrpc_core::Error {
+                            code: jsonrpc_core::ErrorCode::InvalidParams,
+                            message: "to address not found".to_string(),
+                            data: None,
+                        };
+                        Err(err)
+                    }
+                }
+            })
+            .await
+            .map_err(|e| internal_err(format!("eth api call error: {:?}", e.to_string())))?
+            .map_err(|e| internal_err(format!("eth api call error: {:?}", e.to_string())))?;
+
+            Ok(ret)
+        })
     }
 
     fn syncing(&self) -> BoxFuture<Result<SyncStatus>> {
