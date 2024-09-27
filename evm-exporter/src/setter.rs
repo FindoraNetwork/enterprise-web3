@@ -116,42 +116,42 @@ impl Setter for PgSetter {
     fn set_balance(&self, height: u32, address: H160, balance: U256) -> Result<()> {
         self.conn.get()?.execute(
             "INSERT INTO balance(balance, address, height) VALUES($1, $2, $3)",
-            &[&balance.to_string(), &address.to_string(), &( height as i64 )],
+            &[&format!("{:?}", balance), &format!("{:?}", address), &( height as i64 )],
         )?;
         Ok(())
     }
     fn remove_balance(&self, height: u32, address: H160) -> Result<()> {
         self.conn.get()?.execute(
             "DELETE FROM balance WHERE height = $1 AND address = $2",
-            &[&( height as i64 ), &address.to_string()],
+            &[&( height as i64 ), &format!("{:?}", address)],
         )?;
         Ok(())
     }
     fn set_nonce(&self, height: u32, address: H160, nonce: U256) -> Result<()> {
         self.conn.get()?.execute(
             "INSERT INTO nonce(nonce, address, height) VALUES($1, $2, $3)",
-            &[&nonce.to_string(), &address.to_string(), &( height as i64 )],
+            &[&format!("{:?}", nonce), &format!("{:?}", address), &( height as i64 )],
         )?;
         Ok(())
     }
     fn remove_nonce(&self, height: u32, address: H160) -> Result<()> {
         self.conn.get()?.execute(
             "DELETE FROM nonce WHERE height = $1 AND address = $2",
-            &[&( height as i64 ), &address.to_string()],
+            &[&( height as i64 ), &format!("{:?}", address)],
         )?;
         Ok(())
     }
     fn set_byte_code(&self, height: u32, address: H160, code: Vec<u8>) -> Result<()> {
         self.conn.get()?.execute(
             "INSERT INTO byte_code(code, address, height) VALUES($1, $2, $3)",
-            &[&hex::encode(code), &address.to_string(), &( height as i64 )],
+            &[&hex::encode(code), &format!("{:?}", address), &( height as i64 )],
         )?;
         Ok(())
     }
     fn remove_byte_code(&self, height: u32, address: H160) -> Result<()> {
         self.conn.get()?.execute(
             "DELETE FROM byte_code WHERE height = $1 AND address = $2",
-            &[&( height as i64 ), &address.to_string()],
+            &[&( height as i64 ), &format!("{:?}", address)],
         )?;
         Ok(())
     }
@@ -159,9 +159,9 @@ impl Setter for PgSetter {
         self.conn.get()?.execute(
             "INSERT INTO state(value, idx, address, height) VALUES($1, $2, $3, $4)",
             &[
-                &value.to_string(),
-                &index.to_string(),
-                &address.to_string(),
+                &format!("{:?}", value),
+                &format!("{:?}", index),
+                &format!("{:?}", address),
                 &( height as i64 ),
             ],
         )?;
@@ -170,7 +170,7 @@ impl Setter for PgSetter {
     fn remove_state(&self, height: u32, address: H160, index: H256) -> Result<()> {
         self.conn.get()?.execute(
             "DELETE FROM state WHERE height = $1 AND address = $2 AND idx = $3",
-            &[&( height as i64 ), &address.to_string(), &index.to_string()],
+            &[&( height as i64 ), &format!("{:?}", address), &format!("{:?}", index)],
         )?;
         Ok(())
     }
@@ -183,8 +183,8 @@ impl Setter for PgSetter {
         self.conn.get()?.execute(
             "INSERT INTO block_info(block_hash, block_height, block, receipt, statuses) VALUES($1, $2, $3, $4, $5)",
             &[
-                &block.header.hash().to_string(),
-                &block.header.number.to_string(),
+                &format!("{:?}", block.header.hash()),
+                &format!("{:?}", block.header.number),
                 &serde_json::to_string(&block)?,
                 &serde_json::to_string(&receipts)?,
                 &serde_json::to_string(&statuses)?,
@@ -195,8 +195,8 @@ impl Setter for PgSetter {
             self.conn.get()?.execute(
                 "INSERT INTO transactions(transaction_hash, transaction_index) VALUES($1, $2)",
                 &[
-                    &tx.transaction_hash.to_string(),
-                    &serde_json::to_string(&(block.header.hash().to_string(), i as u32))?,
+                    &format!("{:?}", tx.transaction_hash),
+                    &serde_json::to_string(&(block.header.hash(), i as u32))?,
                 ],
             )?;
         }
@@ -208,20 +208,20 @@ impl Setter for PgSetter {
             .get()?
             .query_one(
                 "SELECT statuses FROM block_info WHERE block_height = $1",
-                &[&block_height.to_string()],
+                &[&format!("{:?}", block_height)],
             )?
             .get("statuses");
         let statuses: Vec<TransactionStatus> = serde_json::from_str(&row)?;
 
         self.conn.get()?.execute(
             "DELETE FROM block_info WHERE block_height = $1",
-            &[&block_height.to_string()],
+            &[&format!("{:?}", block_height)],
         )?;
 
         for tx in statuses {
             self.conn.get()?.execute(
                 "DELETE FROM transactions WHERE transaction_hash = $1",
-                &[&tx.transaction_hash.to_string()],
+                &[&format!("{:?}", tx.transaction_hash)],
             )?;
         }
 
@@ -239,7 +239,7 @@ impl Setter for PgSetter {
                 .get()?
                 .query_one(
                     "SELECT balance FROM balance WHERE address = $1 AND height = $2",
-                    &[&sign_address.to_string(), &latest_height],
+                    &[&format!("{:?}", sign_address), &latest_height],
                 )?
                 .get("balance"),
         )?;
@@ -247,9 +247,9 @@ impl Setter for PgSetter {
         self.conn.get()?.execute(
             "INSERT INTO pending_transactions(sign_address, pending_balance, pending_nonce) VALUES($1, $2, $3)",
             &[
-                &sign_address.to_string(),
-                &balance.saturating_sub(transaction.value.saturating_add(transaction.gas_price.saturating_mul(transaction.gas_limit))).to_string(),
-                &transaction.nonce.to_string(),
+                &format!("{:?}", sign_address),
+                &format!("{:?}", balance.saturating_sub(transaction.value.saturating_add(transaction.gas_price.saturating_mul(transaction.gas_limit)))),
+                &format!("{:?}", transaction.nonce),
             ],
             
         )?;
@@ -257,31 +257,31 @@ impl Setter for PgSetter {
     }
     fn set_pending_code(&self, address: H160, code: Vec<u8>) -> Result<()> {
         self.conn.get()?.execute("INSERT INTO pending_byte_code(code, address) VALUES($1, $2)", 
-            &[&serde_json::to_string(&code)?, &address.to_string()],
+            &[&serde_json::to_string(&code)?, &format!("{:?}", address)],
         )?;
         Ok(())
     }
     fn set_pending_state(&self, address: H160, index: H256, value: H256) -> Result<()> {
         self.conn.get()?.execute("INSERT INTO pending_state(value, idx, address) VALUES($1, $2, $3)", 
-            &[&value.to_string(), &index.to_string(), &address.to_string()],
+            &[&format!("{:?}", value), &format!("{:?}", index), &format!("{:?}", address)],
         )?;
         Ok(())
     }
     fn remove_pending_tx(&self, transaction: LegacyTransaction) -> Result<()> {
         let sign_address = recover_signer(&transaction)?;
-        self.conn.get()?.execute("DELETE FROM pending_transactions WHERE sign_address = $1", &[&sign_address.to_string()])?;
+        self.conn.get()?.execute("DELETE FROM pending_transactions WHERE sign_address = $1", &[&format!("{:?}", sign_address)])?;
         Ok(())
     }
     fn remove_pending_code(&self, address: H160) -> Result<()> {
-        self.conn.get()?.execute("DELETE FROM pending_byte_code WHERE address = $1", &[&address.to_string()])?;
+        self.conn.get()?.execute("DELETE FROM pending_byte_code WHERE address = $1", &[&format!("{:?}", address)])?;
         Ok(())
     }
     fn remove_pending_state(&self, address: H160, index: H256) -> Result<()> {
-        self.conn.get()?.execute("DELETE FROM pending_state WHERE address = $1 AND idx = $2", &[&address.to_string(), &index.to_string()])?;
+        self.conn.get()?.execute("DELETE FROM pending_state WHERE address = $1 AND idx = $2", &[&format!("{:?}", address), &format!("{:?}", index)])?;
         Ok(())
     }
     fn set_total_issuance(&self, height: u32, value: U256) -> Result<()> {
-        self.conn.get()?.execute("INSERT INTO issuance(value, height) VALUES($1, $2)", &[&value.to_string(), &( height as i64 )])?;
+        self.conn.get()?.execute("INSERT INTO issuance(value, height) VALUES($1, $2)", &[&format!("{:?}", value), &( height as i64 )])?;
         Ok(())
     }
     fn set_allowances(
@@ -292,7 +292,7 @@ impl Setter for PgSetter {
         value: U256,
     ) -> Result<()> {
         self.conn.get()?.execute("INSERT INTO allowances(owner, spender, value, height) VALUES($1, $2, $3, $4)", 
-            &[&owner.to_string(), &spender.to_string(), &value.to_string(), &( height as i64 )],
+            &[&format!("{:?}", owner), &format!("{:?}", spender), &format!("{:?}", value), &( height as i64 )],
         )?;
         Ok(())
     }
