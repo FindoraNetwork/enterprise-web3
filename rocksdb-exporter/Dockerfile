@@ -1,6 +1,6 @@
 FROM ghcr.io/findoranetwork/enterprise-web3:latest AS fundation
 
-FROM debian:bullseye-slim
+FROM debian:bookworm
 RUN apt-get update -y && apt-get install -y wget redis-tools
 
 RUN mkdir /rocksdb-exporter
