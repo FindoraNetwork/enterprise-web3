@@ -93,7 +93,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT balance FROM balance WHERE address = $1 AND height = $2",
-                    &[&format!("{:?}", address), &(height as i64)],
+                    &[&format!("{:?}", address).to_lowercase(), &(height as i64)],
                 )?
                 .get("balance"),
         )?)
@@ -104,7 +104,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT nonce FROM nonce WHERE address = $1 AND height = $2",
-                    &[&format!("{:?}", address), &(height as i64)],
+                    &[&format!("{:?}", address).to_lowercase(), &(height as i64)],
                 )?
                 .get("nonce"),
         )?)
@@ -115,7 +115,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT code FROM byte_code WHERE address = $1 AND height = $2",
-                    &[&format!("{:?}", address), &(height as i64)],
+                    &[&format!("{:?}", address).to_lowercase(), &(height as i64)],
                 )?
                 .get("code"),
         )?)
@@ -133,7 +133,7 @@ impl Getter for PgGetter {
             .get()?
             .query_one(
                 "SELECT 1 FROM state WHERE address = $1 AND height = $2",
-                &[&format!("{:?}", address), &(height as i64)],
+                &[&format!("{:?}", address).to_lowercase(), &(height as i64)],
             )?
             .is_empty())
     }
@@ -143,7 +143,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT value FROM state WHERE idx = $1 AND address = $2 AND height = $3",
-                    &[&format!("{:?}", index), &format!("{:?}", address), &(height as i64)],
+                    &[&format!("{:?}", index), &format!("{:?}", address).to_lowercase(), &(height as i64)],
                 )?
                 .get("value"),
         )?)
@@ -154,7 +154,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT block_hash FROM block_info WHERE block_height = $1",
-                    &[&height.to_string()],
+                    &[&format!("{:?}", height)],
                 )?
                 .get("block_hash"),
         )?))
@@ -226,7 +226,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT pending_balance FROM pending_transactions WHERE sign_address = $1",
-                    &[&format!("{:?}", address)],
+                    &[&format!("{:?}", address).to_lowercase()],
                 )?
                 .get("pending_balance"),
         )?))
@@ -237,7 +237,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT pending_nonce FROM pending_transactions WHERE sign_address = $1",
-                    &[&format!("{:?}", address)],
+                    &[&format!("{:?}", address).to_lowercase()],
                 )?
                 .get("pending_nonce"),
         )?))
@@ -248,7 +248,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT code FROM pending_byte_code WHERE address = $1",
-                    &[&format!("{:?}", address)],
+                    &[&format!("{:?}", address).to_lowercase()],
                 )?
                 .get("code"),
         )?))
@@ -259,7 +259,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT value FROM pending_state WHERE address = $1 AND idx = $2",
-                    &[&format!("{:?}", address), &format!("{:?}", index)],
+                    &[&format!("{:?}", address).to_lowercase(), &format!("{:?}", index)],
                 )?
                 .get("value"),
         )?))
@@ -281,7 +281,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT value FROM allowances WHERE owner = $1 AND spender = $2 AND height = $3", 
-                    &[&format!("{:?}", owner), &format!("{:?}", spender), &( height as i64 )],
+                    &[&format!("{:?}", owner).to_lowercase(), &format!("{:?}", spender).to_lowercase(), &( height as i64 )],
                 )?
                 .get("value"),
         )?)
