@@ -1,3 +1,4 @@
+use std::fmt::format;
 use {
     crate::{AccountBasic, Block, ConnectionType, Receipt, Result, TransactionStatus},
     primitive_types::{H160, H256, U256},
@@ -92,7 +93,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT balance FROM balance WHERE address = $1 AND height = $2",
-                    &[&address.to_string(), &(height as i64)],
+                    &[&format!("{:?}", address), &(height as i64)],
                 )?
                 .get("balance"),
         )?)
@@ -103,7 +104,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT nonce FROM nonce WHERE address = $1 AND height = $2",
-                    &[&address.to_string(), &(height as i64)],
+                    &[&format!("{:?}", address), &(height as i64)],
                 )?
                 .get("nonce"),
         )?)
@@ -114,7 +115,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT code FROM byte_code WHERE address = $1 AND height = $2",
-                    &[&address.to_string(), &(height as i64)],
+                    &[&format!("{:?}", address), &(height as i64)],
                 )?
                 .get("code"),
         )?)
@@ -132,7 +133,7 @@ impl Getter for PgGetter {
             .get()?
             .query_one(
                 "SELECT 1 FROM state WHERE address = $1 AND height = $2",
-                &[&address.to_string(), &(height as i64)],
+                &[&format!("{:?}", address), &(height as i64)],
             )?
             .is_empty())
     }
@@ -142,7 +143,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT value FROM state WHERE idx = $1 AND address = $2 AND height = $3",
-                    &[&index.to_string(), &address.to_string(), &(height as i64)],
+                    &[&format!("{:?}", index), &format!("{:?}", address), &(height as i64)],
                 )?
                 .get("value"),
         )?)
@@ -164,7 +165,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT block_height FROM block_info WHERE block_hash = $1",
-                    &[&block_hash.to_string()],
+                    &[&format!("{:?}", block_hash)],
                 )?
                 .get("block_height"),
         )?))
@@ -175,7 +176,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT block FROM block_info WHERE block_hash = $1",
-                    &[&block_hash.to_string()],
+                    &[&format!("{:?}", block_hash)],
                 )?
                 .get("block"),
         )?))
@@ -189,7 +190,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT receipt FROM block_info WHERE block_hash = $1",
-                    &[&block_hash.to_string()],
+                    &[&format!("{:?}", block_hash)],
                 )?
                 .get("receipt"),
         )?))
@@ -203,7 +204,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT statuses FROM block_info WHERE block_hash = $1",
-                    &[&block_hash.to_string()],
+                    &[&format!("{:?}", block_hash)],
                 )?
                 .get("statuses"),
         )?))
@@ -214,7 +215,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT transaction_index FROM transactions WHERE transaction_hash = $1",
-                    &[&tx_hash.to_string()],
+                    &[&format!("{:?}", tx_hash)],
                 )?
                 .get("transaction_index"),
         )?))
@@ -225,7 +226,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT pending_balance FROM pending_transactions WHERE sign_address = $1",
-                    &[&address.to_string()],
+                    &[&format!("{:?}", address)],
                 )?
                 .get("pending_balance"),
         )?))
@@ -236,7 +237,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT pending_nonce FROM pending_transactions WHERE sign_address = $1",
-                    &[&address.to_string()],
+                    &[&format!("{:?}", address)],
                 )?
                 .get("pending_nonce"),
         )?))
@@ -247,7 +248,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT code FROM pending_byte_code WHERE address = $1",
-                    &[&address.to_string()],
+                    &[&format!("{:?}", address)],
                 )?
                 .get("code"),
         )?))
@@ -258,7 +259,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT value FROM pending_state WHERE address = $1 AND idx = $2",
-                    &[&address.to_string(), &index.to_string()],
+                    &[&format!("{:?}", address), &format!("{:?}", index)],
                 )?
                 .get("value"),
         )?))
@@ -280,7 +281,7 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT value FROM allowances WHERE owner = $1 AND spender = $2 AND height = $3", 
-                    &[&owner.to_string(),&spender.to_string(),&( height as i64 )],
+                    &[&format!("{:?}", owner), &format!("{:?}", spender), &( height as i64 )],
                 )?
                 .get("value"),
         )?)
