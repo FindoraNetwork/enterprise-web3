@@ -92,7 +92,7 @@ impl Getter for PgGetter {
             self.conn
                 .get()?
                 .query_one(
-                    "SELECT balance FROM balance WHERE address = $1",
+                    "SELECT balance FROM balance WHERE address = $1 ORDER BY height DESC LIMIT 1",
                     &[&format!("{:?}", address).to_lowercase()],
                 )?
                 .get("balance"),
