@@ -243,7 +243,7 @@ impl EthApi for EthService {
                 .await
                 .map_err(|e| {
                     internal_err(format!(
-                        "eth api balance get_pending_balance error: {:?}",
+                        "eth api balance get_pending_balance error1: {:?}",
                         e.to_string()
                     ))
                 })?;
@@ -253,7 +253,7 @@ impl EthApi for EthService {
                     Ok(None) => {}
                     Err(e) => {
                         return Err(internal_err(format!(
-                            "eth api balance get_pending_balance error: {:?}",
+                            "eth api balance get_pending_balance error2: {:?}",
                             e.to_string()
                         )))
                     }
@@ -267,13 +267,13 @@ impl EthApi for EthService {
             .await
             .map_err(|e| {
                 internal_err(format!(
-                    "eth api balance block_number_to_height error: {:?}",
+                    "eth api balance block_number_to_height error1: {:?}",
                     e.to_string()
                 ))
             })?
             .map_err(|e| {
                 internal_err(format!(
-                    "eth api balance block_number_to_height error: {:?}",
+                    "eth api balance block_number_to_height error2: {:?}",
                     e.to_string()
                 ))
             })?;
@@ -282,7 +282,7 @@ impl EthApi for EthService {
                 .await
                 .map_err(|e| {
                     internal_err(format!(
-                        "eth api balance get_balance error: {:?}",
+                        "eth api balance get_balance error1: {:?}",
                         e.to_string()
                     ))
                 })?;
@@ -290,7 +290,7 @@ impl EthApi for EthService {
             match result {
                 Ok(balance) => Ok(balance),
                 Err(e) => Err(internal_err(format!(
-                    "eth api balance get_balance error: {:?}",
+                    "eth api balance get_balance error2: {:?}",
                     e.to_string()
                 ))),
             }
