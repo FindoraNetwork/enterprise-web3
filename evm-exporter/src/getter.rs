@@ -88,15 +88,16 @@ impl Getter for PgGetter {
             .get::<&str, i64>("lowest_height") as u32)
     }
     fn get_balance(&self, height: u32, address: H160) -> Result<U256> {
-        Ok(U256::from_str(
-            self.conn
-                .get()?
-                .query_one(
-                    "SELECT balance FROM balance WHERE address = $1 ORDER BY height DESC LIMIT 1",
-                    &[&format!("{:?}", address).to_lowercase()],
-                )?
-                .get("balance"),
-        )?)
+        match self.conn.get()?.query_one(
+            "SELECT balance FROM balance WHERE address = $1 ORDER BY height DESC LIMIT 1",
+            &[&format!("{:?}", address).to_lowercase()],
+        ) {
+            Ok(row) => {
+                let b = row.try_get("balance")?;
+                Ok(U256::from_str(b)?)
+            }
+            _ => Ok(U256::zero()),
+        }
     }
     fn get_nonce(&self, height: u32, address: H160) -> Result<U256> {
         Ok(U256::from_str(
@@ -143,7 +144,11 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT value FROM state WHERE idx = $1 AND address = $2 AND height = $3",
-                    &[&format!("{:?}", index), &format!("{:?}", address).to_lowercase(), &(height as i64)],
+                    &[
+                        &format!("{:?}", index),
+                        &format!("{:?}", address).to_lowercase(),
+                        &(height as i64),
+                    ],
                 )?
                 .get("value"),
         )?)
@@ -259,7 +264,10 @@ impl Getter for PgGetter {
                 .get()?
                 .query_one(
                     "SELECT value FROM pending_state WHERE address = $1 AND idx = $2",
-                    &[&format!("{:?}", address).to_lowercase(), &format!("{:?}", index)],
+                    &[
+                        &format!("{:?}", address).to_lowercase(),
+                        &format!("{:?}", index),
+                    ],
                 )?
                 .get("value"),
         )?))
