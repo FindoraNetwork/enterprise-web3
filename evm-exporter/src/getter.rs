@@ -1,4 +1,3 @@
-use std::fmt::format;
 use {
     crate::{AccountBasic, Block, ConnectionType, Receipt, Result, TransactionStatus},
     primitive_types::{H160, H256, U256},
@@ -89,12 +88,12 @@ impl Getter for PgGetter {
     }
     fn get_balance(&self, height: u32, address: H160) -> Result<U256> {
         match self.conn.get()?.query_one(
-            "SELECT balance FROM balance WHERE address = $1 ORDER BY height DESC LIMIT 1",
-            &[&format!("{:?}", address).to_lowercase()],
+            "SELECT balance FROM balance WHERE address = $1 AND height <= $2 ORDER BY height DESC LIMIT 1",
+            &[&format!("{:?}", address).to_lowercase(), &(height as i64)],
         ) {
             Ok(row) => {
                 let b = row.try_get("balance")?;
-                Ok(U256::from_str(b)?)
+                Ok(U256::from_str_radix(b, 10)?)
             }
             _ => Ok(U256::zero()),
         }
@@ -104,7 +103,7 @@ impl Getter for PgGetter {
             self.conn
                 .get()?
                 .query_one(
-                    "SELECT nonce FROM nonce WHERE address = $1 AND height = $2",
+                    "SELECT nonce FROM nonce WHERE address = $1 AND height <= $2 ORDER BY height DESC LIMIT 1",
                     &[&format!("{:?}", address).to_lowercase(), &(height as i64)],
                 )?
                 .get("nonce"),
@@ -115,7 +114,7 @@ impl Getter for PgGetter {
             self.conn
                 .get()?
                 .query_one(
-                    "SELECT code FROM byte_code WHERE address = $1 AND height = $2",
+                    "SELECT code FROM byte_code WHERE address = $1 AND height <= $2 ORDER BY height DESC LIMIT 1",
                     &[&format!("{:?}", address).to_lowercase(), &(height as i64)],
                 )?
                 .get("code"),
@@ -133,7 +132,7 @@ impl Getter for PgGetter {
             .conn
             .get()?
             .query_one(
-                "SELECT 1 FROM state WHERE address = $1 AND height = $2",
+                "SELECT 1 FROM state WHERE address = $1 AND height <= $2 ORDER BY height DESC LIMIT 1",
                 &[&format!("{:?}", address).to_lowercase(), &(height as i64)],
             )?
             .is_empty())
@@ -143,7 +142,7 @@ impl Getter for PgGetter {
             self.conn
                 .get()?
                 .query_one(
-                    "SELECT value FROM state WHERE idx = $1 AND address = $2 AND height = $3",
+                    "SELECT value FROM state WHERE idx = $1 AND address = $2 AND height <= $3 ORDER BY height DESC LIMIT 1",
                     &[
                         &format!("{:?}", index),
                         &format!("{:?}", address).to_lowercase(),
@@ -277,7 +276,7 @@ impl Getter for PgGetter {
             self.conn
                 .get()?
                 .query_one(
-                    "SELECT value FROM issuance WHERE height = $1",
+                    "SELECT value FROM issuance WHERE height <= $1 ORDER BY height DESC LIMIT 1",
                     &[&(height as i64)],
                 )?
                 .get("value"),
@@ -288,7 +287,7 @@ impl Getter for PgGetter {
             self.conn
                 .get()?
                 .query_one(
-                    "SELECT value FROM allowances WHERE owner = $1 AND spender = $2 AND height = $3", 
+                    "SELECT value FROM allowances WHERE owner = $1 AND spender = $2 AND height <= $3 ORDER BY height DESC LIMIT 1", 
                     &[&format!("{:?}", owner).to_lowercase(), &format!("{:?}", spender).to_lowercase(), &( height as i64 )],
                 )?
                 .get("value"),
